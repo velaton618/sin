@@ -84,6 +84,34 @@ impl Database {
         Ok(())
     }
 
+    pub fn delete_chat(&self, user_id: i64) -> Result<Option<i64>> {
+        let mut stmt = self
+            .connection
+            .prepare("SELECT chat_one, chat_two FROM chats WHERE chat_one = ?1 OR chat_two = ?1")?;
+
+        let interlocutor_id = stmt
+            .query_row(params![user_id], |row| {
+                let chat_one: i64 = row.get(0)?;
+                let chat_two: i64 = row.get(1)?;
+
+                if chat_one == user_id {
+                    Ok(chat_two)
+                } else {
+                    Ok(chat_one)
+                }
+            })
+            .optional()?;
+
+        if let Some(interlocutor_id) = interlocutor_id {
+            self.connection.execute(
+                "DELETE FROM chats WHERE (chat_one = ?1 AND chat_two = ?2) OR (chat_one = ?2 AND chat_two = ?1)",
+                params![user_id, interlocutor_id],
+            )?;
+        }
+
+        Ok(interlocutor_id)
+    }
+
     pub fn get_user(&self, user_id: i64) -> Result<Option<User>> {
         let mut stmt = self
             .connection

@@ -5,7 +5,6 @@ mod state;
 mod user_state;
 
 use database::Database;
-use lazy_static::lazy_static;
 use log::{debug, error};
 use models::{gender::Gender, user::User};
 use state::State;
@@ -68,6 +67,7 @@ fn schema() -> UpdateHandler<Box<dyn std::error::Error + Send + Sync + 'static>>
 
     let command_handler = teloxide::filter_command::<Command, _>()
         .branch(case![Command::Start].endpoint(start))
+        .branch(case![Command::Stop].endpoint(stop))
         .branch(case![Command::Search].endpoint(idle));
 
     let message_handler = Update::filter_message()
@@ -116,7 +116,6 @@ async fn start(bot: Bot, dialog: Dialog, msg: Message) -> HandlerResult {
         .lock()
         .await;
 
-    println!("Hi");
     let user = db.get_user(dialog.chat_id().0);
 
     if user.is_ok() && user.as_ref().unwrap().is_some() {
@@ -134,6 +133,37 @@ async fn start(bot: Bot, dialog: Dialog, msg: Message) -> HandlerResult {
 
     Ok(())
 }
+
+async fn stop(bot: Bot, dialog: Dialog, msg: Message) -> HandlerResult {
+    let db = DATABASE
+        .get_or_init(|| TokioMutex::new(Database::new("db.db").unwrap()))
+        .lock()
+        .await;
+
+    let intr = db.delete_chat(dialog.chat_id().0);
+    if intr.is_ok() {
+        let intr = intr.unwrap();
+
+        if intr.is_some() {
+            let intr = intr.unwrap();
+
+            bot.send_message(msg.chat.id, " Диалог остановлен!").await?;
+            bot.send_message(ChatId(intr), "Твой собеседник остановил диалог!!")
+                .await?;
+        } else {
+            bot.send_message(msg.chat.id, "Ты не находишься в диалоге!")
+                .await?;
+        }
+    } else {
+        bot.send_message(msg.chat.id, "Ты не находишься в диалоге!")
+            .await?;
+    }
+    dialog.update(State::Idle).await?;
+
+    Ok(())
+}
+
+async fn cancel(bot: Bot, dialog: Dialog, msg: Message) -> HandlerResult {}
 
 async fn receive_message(bot: Bot, dialog: Dialog, msg: Message) -> HandlerResult {
     let db = DATABASE
