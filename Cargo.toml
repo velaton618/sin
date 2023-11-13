@@ -14,3 +14,5 @@ tokio = { version = "1.8", features = ["rt-multi-thread", "macros"] }
 rust-i18n = "2"
 i18n = "0.1.4"
 rusqlite = { version = "0.29.0", features = ["bundled"] }
+lazy_static = "1.4.0"
+once_cell = "1.18.0"

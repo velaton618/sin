@@ -6,6 +6,9 @@ pub enum Command {
     #[command(description = "Список команд")]
     Help,
 
+    #[command(description = "Старт")]
+    Start,
+
     #[command(description = "Поиск")]
     Search,
 }

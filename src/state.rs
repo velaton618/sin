@@ -1,5 +1,3 @@
-use crate::models::gender::Gender;
-
 #[derive(Clone, Default, Debug)]
 pub enum State {
     #[default]
@@ -12,9 +10,10 @@ pub enum State {
         age: u8,
         nickname: String,
     },
-    Completed {
-        age: u8,
-        nickname: String,
-        gender: Gender,
+    SearchChoose,
+    Search,
+    Dialog {
+        interlocutor: u64,
     },
+    Idle,
 }

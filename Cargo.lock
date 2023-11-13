@@ -1401,7 +1401,9 @@ version = "0.1.0"
 dependencies = [
  "dotenv",
  "i18n",
+ "lazy_static",
  "log",
+ "once_cell",
  "pretty_env_logger",
  "rusqlite",
  "rust-i18n",
