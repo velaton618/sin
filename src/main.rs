@@ -50,9 +50,9 @@ async fn main() {
     let bot = Bot::from_env();
 
     for user in users {
-        bot.send_message(ChatId(user.id), "Наш бот перезагрузился")
-            .await
-            .unwrap();
+        let _ = bot
+            .send_message(ChatId(user.id), "Наш бот перезагрузился")
+            .await;
     }
 
     Dispatcher::builder(bot, schema())
@@ -493,7 +493,7 @@ async fn search_callback(bot: Bot, dialog: Dialog, q: CallbackQuery) -> HandlerR
                         bot.send_message(
                             dialog.chat_id(),
                             format!(
-                            "{} {} ({})\n\nСобеседник найден!\n\n/stop - чтобы оставноить диалог",
+                            "{} {} ({})\n\nСобеседник найден!\n\n/stop - чтобы остановить диалог",
                             if interlocutor.gender == Gender::Male {
                                 "🍌"
                             } else {
@@ -507,7 +507,7 @@ async fn search_callback(bot: Bot, dialog: Dialog, q: CallbackQuery) -> HandlerR
                         bot.send_message(
                             ChatId(result),
                             format!(
-                            "{} {} ({})\n\nСобеседник найден!\n\n/stop - чтобы оставноить диалог",
+                            "{} {} ({})\n\nСобеседник найден!\n\n/stop - чтобы остановить диалог",
                             if user.gender.clone() == Gender::Male {
                                 "🍌"
                             } else {
