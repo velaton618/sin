@@ -26,4 +26,7 @@ pub enum Command {
 
     #[command(description = "Изменить возраст")]
     SetAge,
+
+    #[command(description = "Админ команда чтобы узнать количество пользователей")]
+    Admin,
 }

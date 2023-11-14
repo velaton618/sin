@@ -76,6 +76,7 @@ fn schema() -> UpdateHandler<Box<dyn std::error::Error + Send + Sync + 'static>>
                 .branch(case![Command::Search].endpoint(dialog_search)),
         )
         .branch(case![Command::SetName].endpoint(set_name))
+        .branch(case![Command::Admin].endpoint(admin))
         .branch(case![Command::SetAge].endpoint(set_age));
 
     let message_handler = Update::filter_message()
@@ -105,6 +106,19 @@ async fn dialog_search(bot: Bot, dialog: Dialog, _: Message) -> HandlerResult {
     bot.send_message(dialog.chat_id(), "Ты уже в диалоге!")
         .await
         .unwrap();
+
+    Ok(())
+}
+
+async fn admin(bot: Bot, _: Dialog, msg: Message) -> HandlerResult {
+    let admin = env::var("ADMIN").unwrap();
+    let db = DATABASE.get_or_init(|| TokioMutex::new(Database::new("db.db").unwrap()));
+    let users = db.lock().await.get_all_users().unwrap();
+
+    if msg.chat.id.0.to_string() == admin {
+        bot.send_message(msg.chat.id, format!("Сейчас {} Пользователей", users.len()))
+            .await?;
+    }
 
     Ok(())
 }
