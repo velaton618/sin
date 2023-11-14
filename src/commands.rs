@@ -20,25 +20,16 @@ pub async fn admin(bot: Bot, _: Dialog, msg: Message) -> HandlerResult {
     let female_count = db.get_female_count()?;
     let male_count = db.get_male_count()?;
     let total_chats = db.get_total_chats()?;
-    let total_female_vulgar = db.get_female_count_in_vulgar_chats()?;
-    let total_male_vulgar = db.get_male_count_in_vulgar_chats()?;
-
-    let total_female_chats = db.get_female_count_in_chats()?;
-    let total_male_chats = db.get_male_count_in_chats()?;
+    let total_queue = db.get_queue_count()?;
+    let total_male_queue = db.get_male_queue_count()?;
+    let total_female_queue = db.get_female_queue_count()?;
 
     if msg.chat.id.0.to_string() == admin {
         bot.send_message(
             msg.chat.id,
             format!(
-                "Users: {}\n🍌 Males: {}\n🍑 Females: {}\n\n🗨️ Chats: {}\n\n🔞🍌: {}\n🔞🍑: {}\n\n🗨️🍌: {}\n🗨️🍑: {}",
-                total_users,
-                male_count,
-                female_count,
-                total_chats,
-                total_male_vulgar,
-                total_female_vulgar,
-                total_male_chats,
-                total_female_chats
+                "Users: {}\n🍌 Males: {}\n🍑 Females: {}\n\n🗨️ Chats: {}\n\nQueue: {}\n\n\n🍌 Queue Males: {}\n🍑 Queue Females: {}",
+                total_users, male_count, female_count, total_chats, total_queue, total_male_queue, total_female_queue
             ),
         )
         .await?;

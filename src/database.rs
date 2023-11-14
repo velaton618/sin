@@ -78,38 +78,6 @@ impl Database {
         Ok(count)
     }
 
-    pub fn get_female_count_in_chats(&self) -> Result<usize> {
-        let mut stmt = self
-            .connection
-            .prepare("SELECT COUNT(*) FROM users u JOIN chats c ON u.id = c.chat_one WHERE u.gender = 'Female'")?;
-        let count: usize = stmt.query_row([], |row| row.get(0))?;
-        Ok(count)
-    }
-
-    pub fn get_male_count_in_chats(&self) -> Result<usize> {
-        let mut stmt = self
-            .connection
-            .prepare("SELECT COUNT(*) FROM users u JOIN chats c ON u.id = c.chat_one WHERE u.gender = 'Male'")?;
-        let count: usize = stmt.query_row([], |row| row.get(0))?;
-        Ok(count)
-    }
-
-    pub fn get_female_count_in_vulgar_chats(&self) -> Result<usize> {
-        let mut stmt = self
-            .connection
-            .prepare("SELECT COUNT(*) FROM users u JOIN chats c ON u.id = c.chat_one WHERE u.gender = 'Female' AND c.chat_type = 1")?;
-        let count: usize = stmt.query_row([], |row| row.get(0))?;
-        Ok(count)
-    }
-
-    pub fn get_male_count_in_vulgar_chats(&self) -> Result<usize> {
-        let mut stmt = self
-            .connection
-            .prepare("SELECT COUNT(*) FROM users u JOIN chats c ON u.id = c.chat_one WHERE u.gender = 'Male' AND c.chat_type = 1")?;
-        let count: usize = stmt.query_row([], |row| row.get(0))?;
-        Ok(count)
-    }
-
     pub fn get_chat(&self, user_id: i64) -> Result<Option<i64>> {
         let mut stmt = self
             .connection
@@ -128,6 +96,28 @@ impl Database {
             .optional()?;
 
         Ok(chat)
+    }
+
+    pub fn get_queue_count(&self) -> Result<usize> {
+        let mut stmt = self.connection.prepare("SELECT COUNT(*) FROM queue")?;
+        let count: usize = stmt.query_row([], |row| row.get(0))?;
+        Ok(count)
+    }
+
+    pub fn get_female_queue_count(&self) -> Result<usize> {
+        self.get_gender_queue_count(Gender::Female)
+    }
+
+    pub fn get_male_queue_count(&self) -> Result<usize> {
+        self.get_gender_queue_count(Gender::Male)
+    }
+
+    pub fn get_gender_queue_count(&self, gender: Gender) -> Result<usize> {
+        let mut stmt = self.connection.prepare(
+            "SELECT COUNT(*) FROM queue INNER JOIN users ON queue.user_id = users.id WHERE users.gender = ?1",
+        )?;
+        let count: usize = stmt.query_row(params![gender.to_string()], |row| row.get(0))?;
+        Ok(count)
     }
 
     pub fn decrease_reputation(&self, user_id: i64, amount: i32) -> Result<()> {
