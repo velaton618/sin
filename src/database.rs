@@ -78,6 +78,38 @@ impl Database {
         Ok(count)
     }
 
+    pub fn get_female_count_in_chats(&self) -> Result<usize> {
+        let mut stmt = self
+            .connection
+            .prepare("SELECT COUNT(*) FROM users u JOIN chats c ON u.id = c.chat_one WHERE u.gender = 'Female'")?;
+        let count: usize = stmt.query_row([], |row| row.get(0))?;
+        Ok(count)
+    }
+
+    pub fn get_male_count_in_chats(&self) -> Result<usize> {
+        let mut stmt = self
+            .connection
+            .prepare("SELECT COUNT(*) FROM users u JOIN chats c ON u.id = c.chat_one WHERE u.gender = 'Male'")?;
+        let count: usize = stmt.query_row([], |row| row.get(0))?;
+        Ok(count)
+    }
+
+    pub fn get_female_count_in_vulgar_chats(&self) -> Result<usize> {
+        let mut stmt = self
+            .connection
+            .prepare("SELECT COUNT(*) FROM users u JOIN chats c ON u.id = c.chat_one WHERE u.gender = 'Female' AND c.chat_type = 1")?;
+        let count: usize = stmt.query_row([], |row| row.get(0))?;
+        Ok(count)
+    }
+
+    pub fn get_male_count_in_vulgar_chats(&self) -> Result<usize> {
+        let mut stmt = self
+            .connection
+            .prepare("SELECT COUNT(*) FROM users u JOIN chats c ON u.id = c.chat_one WHERE u.gender = 'Male' AND c.chat_type = 1")?;
+        let count: usize = stmt.query_row([], |row| row.get(0))?;
+        Ok(count)
+    }
+
     pub fn get_chat(&self, user_id: i64) -> Result<Option<i64>> {
         let mut stmt = self
             .connection

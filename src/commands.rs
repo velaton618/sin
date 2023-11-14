@@ -20,13 +20,25 @@ pub async fn admin(bot: Bot, _: Dialog, msg: Message) -> HandlerResult {
     let female_count = db.get_female_count()?;
     let male_count = db.get_male_count()?;
     let total_chats = db.get_total_chats()?;
+    let total_female_vulgar = db.get_female_count_in_vulgar_chats()?;
+    let total_male_vulgar = db.get_male_count_in_vulgar_chats()?;
+
+    let total_female_chats = db.get_female_count_in_chats()?;
+    let total_male_chats = db.get_male_count_in_chats()?;
 
     if msg.chat.id.0.to_string() == admin {
         bot.send_message(
             msg.chat.id,
             format!(
-                "Users: {}\n🍌 Males: {}\n🍑 Females: {}\n\n🗨️ Chats: {}",
-                total_users, male_count, female_count, total_chats
+                "Users: {}\n🍌 Males: {}\n🍑 Females: {}\n\n🗨️ Chats: {}\n\n🔞🍌: {}\n🔞🍑: {}\n\n🗨️🍌: {}\n🗨️🍑: {}",
+                total_users,
+                male_count,
+                female_count,
+                total_chats,
+                total_male_vulgar,
+                total_female_vulgar,
+                total_male_chats,
+                total_female_chats
             ),
         )
         .await?;
