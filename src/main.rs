@@ -20,7 +20,7 @@ use teloxide::{
 use tokio::sync::Mutex as TokioMutex;
 use user_state::UserState;
 
-use crate::command::Command;
+use crate::{command::Command, models::chat_type::ChatType};
 
 use once_cell::sync::OnceCell;
 
@@ -290,13 +290,15 @@ async fn stop(bot: Bot, dialog: Dialog, msg: Message) -> HandlerResult {
     Ok(())
 }
 
-async fn cancel(bot: Bot, _: Dialog, msg: Message) -> HandlerResult {
+async fn cancel(bot: Bot, dialog: Dialog, msg: Message) -> HandlerResult {
     let db = DATABASE
         .get_or_init(|| TokioMutex::new(Database::new("db.db").unwrap()))
         .lock()
         .await;
     db.dequeue_user(msg.chat.id.0).unwrap();
     bot.send_message(msg.chat.id, "Поиск отменён!").await?;
+    dialog.update(State::Idle).await?;
+    db.set_user_state(msg.chat.id.0, UserState::Idle).unwrap();
 
     Ok(())
 }
@@ -440,6 +442,10 @@ async fn search_callback(bot: Bot, dialog: Dialog, q: CallbackQuery) -> HandlerR
                 .await;
             db.dequeue_user(dialog.chat_id().0).unwrap();
             bot.send_message(dialog.chat_id(), "Поиск отменён!").await?;
+            dialog.update(State::Idle).await?;
+            db.set_user_state(dialog.chat_id().0, UserState::Idle)
+                .unwrap();
+
             return Ok(());
         }
 
@@ -461,7 +467,8 @@ async fn search_callback(bot: Bot, dialog: Dialog, q: CallbackQuery) -> HandlerR
 
             if user.is_some() {
                 let user = user.unwrap();
-                let result = db.enqueue_user(dialog.chat_id().0, gender, user.gender);
+                let result =
+                    db.enqueue_user(dialog.chat_id().0, gender, user.gender, ChatType::Vulgar);
 
                 println!("{:?}", result);
 

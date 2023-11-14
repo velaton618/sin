@@ -1,5 +1,5 @@
 use crate::{
-    models::{gender::Gender, user::User},
+    models::{chat_type::ChatType, gender::Gender, user::User},
     user_state::UserState,
 };
 use rusqlite::{params, Connection, OptionalExtension, Result};
@@ -27,6 +27,7 @@ impl Database {
                 user_id INTEGER PRIMARY KEY,
                 search_gender INTEGER DEFAULT 0,
                 searcher_gender INTEGER NOT NULL,
+                chat_type INTEGER DEFAULT 0,
                 UNIQUE(user_id)
             )",
             [],
@@ -37,6 +38,7 @@ impl Database {
                   id INTEGER PRIMARY KEY,
                   chat_one INTEGER KEY NOT NULL,
                   chat_two INTEGER KEY NOT NULL,
+                  chat_type INTEGER DEFAULT 0,
                   UNIQUE(chat_one),
                   UNIQUE(chat_two)
                   )",
@@ -44,14 +46,6 @@ impl Database {
         )?;
 
         Ok(Database { connection })
-    }
-
-    pub fn create_chat(&self, user_id_one: i64, user_id_two: i64) -> Result<()> {
-        self.connection.execute(
-            "INSERT INTO chats (chat_one, chat_two) VALUES (?1, ?2)",
-            params![user_id_one, user_id_two],
-        )?;
-        Ok(())
     }
 
     pub fn get_chat(&self, user_id: i64) -> Result<Option<i64>> {
@@ -183,17 +177,35 @@ impl Database {
         Ok(())
     }
 
+    pub fn create_chat(
+        &self,
+        user_id_one: i64,
+        user_id_two: i64,
+        chat_type: ChatType,
+    ) -> Result<()> {
+        self.connection.execute(
+            "INSERT INTO chats (chat_one, chat_two, chat_type) VALUES (?1, ?2, ?3)",
+            params![user_id_one, user_id_two, chat_type as i32],
+        )?;
+        Ok(())
+    }
+
     pub fn enqueue_user(
         &self,
         user_id: i64,
         search_gender: Gender,
         searcher_gender: Gender,
+        chat_type: ChatType,
     ) -> Result<i64> {
         let mut stmt = self.connection.prepare(
-            "SELECT user_id FROM queue WHERE searcher_gender = ?1 AND search_gender = ?2 LIMIT 1",
+            "SELECT user_id FROM queue WHERE searcher_gender = ?1 AND search_gender = ?2 AND chat_type = ?3 LIMIT 1",
         )?;
         let matching_user_id: Result<i64> = stmt.query_row(
-            params![search_gender.clone() as i32, searcher_gender.clone() as i32],
+            params![
+                search_gender.clone() as i32,
+                searcher_gender.clone() as i32,
+                chat_type.clone() as i32
+            ],
             |row| row.get(0),
         );
 
@@ -201,14 +213,14 @@ impl Database {
             Ok(match_id) => {
                 self.connection
                     .execute("DELETE FROM queue WHERE user_id = ?1", params![match_id])?;
-                self.create_chat(user_id, match_id)?;
+                self.create_chat(user_id, match_id, chat_type)?;
 
                 return Ok(match_id);
             }
             Err(_) => {
                 self.connection.execute(
-                    "INSERT INTO queue (user_id, search_gender, searcher_gender) VALUES (?1, ?2, ?3)",
-                    params![user_id, search_gender as i32, searcher_gender as i32],
+                    "INSERT INTO queue (user_id, search_gender, searcher_gender, chat_type) VALUES (?1, ?2, ?3, ?4)",
+                    params![user_id, search_gender as i32, searcher_gender as i32, chat_type as i32],
                 )?;
             }
         }
