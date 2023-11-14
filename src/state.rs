@@ -1,3 +1,5 @@
+use crate::models::gender::Gender;
+
 #[derive(Clone, Default, Debug)]
 pub enum State {
     #[default]
@@ -10,7 +12,10 @@ pub enum State {
         age: u8,
         nickname: String,
     },
-    SearchChoose,
+    SearchChooseGender,
+    SearchChooseChatType {
+        gender: Gender,
+    },
     Search,
     Dialog {
         interlocutor: u64,
