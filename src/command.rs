@@ -20,4 +20,10 @@ pub enum Command {
 
     #[command(description = "Остановить диалог")]
     Stop,
+
+    #[command(description = "Изменить имя")]
+    SetName,
+
+    #[command(description = "Изменить возраст")]
+    SetAge,
 }

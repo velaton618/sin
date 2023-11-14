@@ -16,4 +16,6 @@ pub enum State {
         interlocutor: u64,
     },
     Idle,
+    SetNickname,
+    SetAge,
 }

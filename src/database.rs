@@ -221,4 +221,28 @@ impl Database {
             .execute("DELETE FROM queue WHERE user_id = ?1", params![user_id])?;
         Ok(())
     }
+
+    pub fn update_user_nickname(&self, user_id: i64, new_nickname: &str) -> Result<()> {
+        self.connection.execute(
+            "UPDATE users SET nickname = ?1 WHERE id = ?2",
+            params![new_nickname, user_id],
+        )?;
+        Ok(())
+    }
+
+    pub fn update_user_age(&self, user_id: i64, new_age: u8) -> Result<()> {
+        self.connection.execute(
+            "UPDATE users SET age = ?1 WHERE id = ?2",
+            params![new_age, user_id],
+        )?;
+        Ok(())
+    }
+
+    pub fn update_user_gender(&self, user_id: i64, new_gender: Gender) -> Result<()> {
+        self.connection.execute(
+            "UPDATE users SET gender = ?1 WHERE id = ?2",
+            params![new_gender.to_string(), user_id],
+        )?;
+        Ok(())
+    }
 }

@@ -74,13 +74,17 @@ fn schema() -> UpdateHandler<Box<dyn std::error::Error + Send + Sync + 'static>>
         .branch(
             case![State::Dialog { interlocutor }]
                 .branch(case![Command::Search].endpoint(dialog_search)),
-        );
+        )
+        .branch(case![Command::SetName].endpoint(set_name))
+        .branch(case![Command::SetAge].endpoint(set_age));
 
     let message_handler = Update::filter_message()
         .branch(command_handler)
         .enter_dialogue::<Message, InMemStorage<State>, State>()
         .branch(dptree::case![State::Idle].endpoint(idle))
         .branch(dptree::case![State::Start].endpoint(start))
+        .branch(dptree::case![State::SetAge].endpoint(receive_set_age))
+        .branch(dptree::case![State::SetNickname].endpoint(receive_set_nickname))
         .branch(dptree::case![State::ReceiveAge].endpoint(receive_age))
         .branch(dptree::case![State::ReceiveNickname { age }].endpoint(receive_nickname))
         .branch(dptree::case![State::Search].endpoint(receive_message))
@@ -97,7 +101,7 @@ fn schema() -> UpdateHandler<Box<dyn std::error::Error + Send + Sync + 'static>>
         .branch(callback_query_handler)
 }
 
-async fn dialog_search(bot: Bot, dialog: Dialog, msg: Message) -> HandlerResult {
+async fn dialog_search(bot: Bot, dialog: Dialog, _: Message) -> HandlerResult {
     bot.send_message(dialog.chat_id(), "Ты уже в диалоге!")
         .await
         .unwrap();
@@ -140,7 +144,7 @@ async fn idle(bot: Bot, dialog: Dialog, msg: Message) -> HandlerResult {
 
             let genders =
                 ["🍌", "🍑"].map(|product| InlineKeyboardButton::callback(product, product));
-            bot.send_message(dialog.chat_id(), "Теперь выбери тип письки собеседника")
+            bot.send_message(dialog.chat_id(), "Теперь выбери пол собеседника")
                 .reply_markup(InlineKeyboardMarkup::new([genders]))
                 .await
                 .unwrap();
@@ -174,6 +178,75 @@ async fn start(bot: Bot, dialog: Dialog, msg: Message) -> HandlerResult {
         )
         .await?;
         dialog.update(State::ReceiveAge).await?;
+    }
+
+    Ok(())
+}
+
+async fn set_name(bot: Bot, dialog: Dialog, msg: Message) -> HandlerResult {
+    bot.send_message(
+        msg.chat.id,
+        "Введите свой новый никнейм(он будет публичным): ",
+    )
+    .await?;
+    dialog.update(State::SetNickname).await?;
+
+    Ok(())
+}
+
+async fn set_age(bot: Bot, dialog: Dialog, msg: Message) -> HandlerResult {
+    bot.send_message(msg.chat.id, "Введите свой возраст(он будет публичным): ")
+        .await?;
+
+    dialog.update(State::SetAge).await?;
+
+    Ok(())
+}
+
+async fn receive_set_age(bot: Bot, dialog: Dialog, msg: Message) -> HandlerResult {
+    match msg.text().map(|text| text.parse::<u8>()) {
+        Some(Ok(age)) => {
+            if age < 12 {
+                bot.send_message(msg.chat.id, "Эй, ты ещё ребенок!").await?;
+                dialog.update(State::Idle).await?;
+            } else {
+                let db = DATABASE
+                    .get_or_init(|| TokioMutex::new(Database::new("db.db").unwrap()))
+                    .lock()
+                    .await;
+                db.update_user_age(msg.chat.id.0, age).unwrap();
+
+                bot.send_message(msg.chat.id, "Готово").await?;
+
+                dialog.update(State::Idle).await?;
+            }
+        }
+        _ => {
+            bot.send_message(msg.chat.id, "Пытаешься найти баг? Давай заново!")
+                .await?;
+        }
+    }
+
+    Ok(())
+}
+
+async fn receive_set_nickname(bot: Bot, dialog: Dialog, msg: Message) -> HandlerResult {
+    match msg.text().map(ToOwned::to_owned) {
+        Some(nickname) => {
+            let db = DATABASE
+                .get_or_init(|| TokioMutex::new(Database::new("db.db").unwrap()))
+                .lock()
+                .await;
+
+            db.update_user_nickname(msg.chat.id.0, &nickname).unwrap();
+            bot.send_message(msg.chat.id, "Готово").await?;
+
+            dialog.update(State::Idle).await?;
+        }
+        _ => {
+            bot.send_message(msg.chat.id, "Пытаешься найти баг? Давай заново!")
+                .await?;
+        }
     }
 
     Ok(())
@@ -342,7 +415,7 @@ async fn receive_nickname(bot: Bot, dialog: Dialog, msg: Message, age: u8) -> Ha
         Some(nickname) => {
             let genders =
                 ["🍌", "🍑"].map(|product| InlineKeyboardButton::callback(product, product));
-            bot.send_message(msg.chat.id, "Теперь выбери свой тип письки")
+            bot.send_message(msg.chat.id, "Теперь выбери свой пол")
                 .reply_markup(InlineKeyboardMarkup::new([genders]))
                 .await?;
             dialog
@@ -498,7 +571,7 @@ async fn receive_gender(
         .await?;
 
         let genders = ["🍌", "🍑"].map(|product| InlineKeyboardButton::callback(product, product));
-        bot.send_message(dialog.chat_id(), "Теперь выбери тип письки собеседника")
+        bot.send_message(dialog.chat_id(), "Теперь выбери пол собеседника")
             .reply_markup(InlineKeyboardMarkup::new([genders]))
             .await?;
         dialog.update(State::SearchChoose).await?;
