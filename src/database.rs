@@ -24,10 +24,11 @@ impl Database {
 
         connection.execute(
             "CREATE TABLE IF NOT EXISTS queue (
-                  user_id INTEGER PRIMARY KEY,
-                  search_gender INTEGER DEFAULT 0,
-                  searcher_gender INTEGER NOT NULL
-                  )",
+                user_id INTEGER PRIMARY KEY,
+                search_gender INTEGER DEFAULT 0,
+                searcher_gender INTEGER NOT NULL,
+                UNIQUE(user_id)
+            )",
             [],
         )?;
 
@@ -35,7 +36,9 @@ impl Database {
             "CREATE TABLE IF NOT EXISTS chats (
                   id INTEGER PRIMARY KEY,
                   chat_one INTEGER KEY NOT NULL,
-                  chat_two INTEGER KEY NOT NULL
+                  chat_two INTEGER KEY NOT NULL,
+                  UNIQUE(chat_one),
+                  UNIQUE(chat_two)
                   )",
             [],
         )?;
@@ -169,19 +172,6 @@ impl Database {
 
         let users: Result<Vec<User>> = user_iter.collect();
         Ok(users?)
-    }
-
-    pub fn get_user_state(&self, user_id: i64) -> Result<Option<UserState>> {
-        let mut stmt = self
-            .connection
-            .prepare("SELECT state FROM users WHERE id = ?1")?;
-        let state = stmt
-            .query_row(params![user_id], |row| {
-                let state_int: i32 = row.get(0)?;
-                Ok(UserState::from(state_int))
-            })
-            .optional()?;
-        Ok(state)
     }
 
     pub fn set_user_state(&self, user_id: i64, new_state: UserState) -> Result<()> {

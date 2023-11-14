@@ -5,7 +5,7 @@ mod state;
 mod user_state;
 
 use database::Database;
-use log::{debug, error};
+use log::debug;
 use models::{gender::Gender, user::User};
 use state::State;
 use std::env;
@@ -18,6 +18,7 @@ use teloxide::{
     types::{InlineKeyboardButton, InlineKeyboardMarkup, InputFile},
 };
 use tokio::sync::Mutex as TokioMutex;
+use user_state::UserState;
 
 use crate::command::Command;
 
@@ -67,14 +68,19 @@ fn schema() -> UpdateHandler<Box<dyn std::error::Error + Send + Sync + 'static>>
 
     let command_handler = teloxide::filter_command::<Command, _>()
         .branch(case![Command::Start].endpoint(start))
-        .branch(case![Command::Stop].endpoint(stop))
-        .branch(case![Command::Search].endpoint(idle));
+        .branch(case![State::Dialog { interlocutor }].branch(case![Command::Stop].endpoint(stop)))
+        .branch(case![Command::Search].endpoint(idle))
+        .branch(case![Command::Cancel].endpoint(cancel))
+        .branch(
+            case![State::Dialog { interlocutor }]
+                .branch(case![Command::Search].endpoint(dialog_search)),
+        );
 
     let message_handler = Update::filter_message()
         .branch(command_handler)
         .enter_dialogue::<Message, InMemStorage<State>, State>()
         .branch(dptree::case![State::Idle].endpoint(idle))
-        .branch(dptree::case![State::Start].endpoint(idle))
+        .branch(dptree::case![State::Start].endpoint(start))
         .branch(dptree::case![State::ReceiveAge].endpoint(receive_age))
         .branch(dptree::case![State::ReceiveNickname { age }].endpoint(receive_nickname))
         .branch(dptree::case![State::Search].endpoint(receive_message))
@@ -83,16 +89,55 @@ fn schema() -> UpdateHandler<Box<dyn std::error::Error + Send + Sync + 'static>>
     let callback_query_handler = Update::filter_callback_query()
         .branch(case![State::ReceiveGender { age, nickname }].endpoint(receive_gender))
         .branch(dptree::case![State::SearchChoose])
-        .endpoint(receive_interlocutor_gender);
+        .branch(dptree::case![State::Search])
+        .endpoint(search_callback);
 
     dialogue::enter::<Update, InMemStorage<State>, State, _>()
         .branch(message_handler)
         .branch(callback_query_handler)
 }
 
+async fn dialog_search(bot: Bot, dialog: Dialog, msg: Message) -> HandlerResult {
+    bot.send_message(dialog.chat_id(), "Ты уже в диалоге!")
+        .await
+        .unwrap();
+
+    Ok(())
+}
+
 async fn idle(bot: Bot, dialog: Dialog, msg: Message) -> HandlerResult {
     if let Some(txt) = msg.text() {
         if txt.contains("search") {
+            let db = DATABASE
+                .get_or_init(|| TokioMutex::new(Database::new("db.db").unwrap()))
+                .lock()
+                .await;
+
+            let user = db.get_user(dialog.chat_id().0);
+
+            if user.is_ok() && user.as_ref().unwrap().is_some() {
+                let user = user.unwrap().unwrap();
+                if user.state == UserState::Dialog {
+                    bot.send_message(dialog.chat_id(), "Ты не готов к поиску! Останови диалог")
+                        .await?;
+
+                    return Ok(());
+                } else if user.state == UserState::Search {
+                    bot.send_message(dialog.chat_id(), "Не мешай! Я ищу")
+                        .await?;
+
+                    return Ok(());
+                }
+            } else {
+                bot.send_message(
+                    dialog.chat_id(),
+                    "Ты не готов к поиску! Зарегестрируйся!\n\n/start",
+                )
+                .await?;
+
+                return Ok(());
+            }
+
             let genders =
                 ["🍌", "🍑"].map(|product| InlineKeyboardButton::callback(product, product));
             bot.send_message(dialog.chat_id(), "Теперь выбери тип письки собеседника")
@@ -141,13 +186,22 @@ async fn stop(bot: Bot, dialog: Dialog, msg: Message) -> HandlerResult {
         .await;
 
     let intr = db.delete_chat(dialog.chat_id().0);
+    dialog.update(State::Idle).await?;
+
     if intr.is_ok() {
         let intr = intr.unwrap();
 
         if intr.is_some() {
             let intr = intr.unwrap();
 
-            bot.send_message(msg.chat.id, " Диалог остановлен!").await?;
+            db.set_user_state(msg.chat.id.0, UserState::Idle).unwrap();
+            db.set_user_state(intr, UserState::Idle).unwrap();
+
+            bot.send_message(
+                msg.chat.id,
+                " Диалог остановлен!\n\n/search - найти нового собеседника",
+            )
+            .await?;
             bot.send_message(ChatId(intr), "Твой собеседник остановил диалог!!")
                 .await?;
         } else {
@@ -163,13 +217,30 @@ async fn stop(bot: Bot, dialog: Dialog, msg: Message) -> HandlerResult {
     Ok(())
 }
 
-async fn cancel(bot: Bot, dialog: Dialog, msg: Message) -> HandlerResult {}
-
-async fn receive_message(bot: Bot, dialog: Dialog, msg: Message) -> HandlerResult {
+async fn cancel(bot: Bot, _: Dialog, msg: Message) -> HandlerResult {
     let db = DATABASE
         .get_or_init(|| TokioMutex::new(Database::new("db.db").unwrap()))
         .lock()
         .await;
+    db.dequeue_user(msg.chat.id.0).unwrap();
+    bot.send_message(msg.chat.id, "Поиск отменён!").await?;
+
+    Ok(())
+}
+
+async fn receive_message(bot: Bot, dialog: Dialog, msg: Message) -> HandlerResult {
+    if let Some(txt) = msg.text() {
+        if txt.contains("search") {
+            bot.send_message(msg.chat.id, "Не мешай! Я ищу").await?;
+            return Ok(());
+        }
+
+        if txt.contains("stop") {
+            stop(bot, dialog, msg).await?;
+            return Ok(());
+        }
+    }
+    let db = Database::new("db.db").unwrap();
 
     let chat = db.get_chat(dialog.chat_id().0);
 
@@ -287,8 +358,18 @@ async fn receive_nickname(bot: Bot, dialog: Dialog, msg: Message, age: u8) -> Ha
     Ok(())
 }
 
-async fn receive_interlocutor_gender(bot: Bot, dialog: Dialog, q: CallbackQuery) -> HandlerResult {
+async fn search_callback(bot: Bot, dialog: Dialog, q: CallbackQuery) -> HandlerResult {
     if let Some(g) = &q.data {
+        if g == "cancel" {
+            let db = DATABASE
+                .get_or_init(|| TokioMutex::new(Database::new("db.db").unwrap()))
+                .lock()
+                .await;
+            db.dequeue_user(dialog.chat_id().0).unwrap();
+            bot.send_message(dialog.chat_id(), "Поиск отменён!").await?;
+            return Ok(());
+        }
+
         let gender;
         if g == "🍌" {
             gender = Gender::Male;
@@ -307,35 +388,64 @@ async fn receive_interlocutor_gender(bot: Bot, dialog: Dialog, q: CallbackQuery)
 
             if user.is_some() {
                 let user = user.unwrap();
-                let result = db
-                    .enqueue_user(dialog.chat_id().0, gender, user.gender)
-                    .map_err(|e| {
-                        error!(
-                            "Something went wrong in receive_interlocutor_gender: {}",
-                            e.to_string()
-                        );
-                    })
-                    .unwrap();
-                bot.send_message(dialog.chat_id(), format!("Ищу...",))
-                    .await?;
-                db.set_user_state(user.id, user_state::UserState::Search)
-                    .unwrap();
-                dialog.update(State::Search).await?;
+                let result = db.enqueue_user(dialog.chat_id().0, gender, user.gender);
 
-                if result != 0 {
-                    dialog
-                        .update(State::Dialog {
-                            interlocutor: result as u64,
-                        })
+                println!("{:?}", result);
+
+                if result.is_ok() {
+                    let result = result.unwrap();
+                    let cancel = [InlineKeyboardButton::callback("❌ Отменить", "cancel")];
+                    bot.send_message(dialog.chat_id(), "Ищу...")
+                        .reply_markup(InlineKeyboardMarkup::new([cancel]))
                         .await?;
-                    bot.send_message(dialog.chat_id(), format!("Нашёл!",))
-                        .await?;
-                    bot.send_message(ChatId(result), format!("А вот уже и нашелся!",))
-                        .await?;
-                    db.set_user_state(user.id, user_state::UserState::Dialog)
+                    dialog.update(State::Search).await?;
+
+                    db.set_user_state(user.id, user_state::UserState::Search)
                         .unwrap();
-                    db.set_user_state(result, user_state::UserState::Dialog)
-                        .unwrap();
+
+                    if result != 0 {
+                        dialog
+                            .update(State::Dialog {
+                                interlocutor: result as u64,
+                            })
+                            .await?;
+                        let interlocutor = db.get_user(result).unwrap().unwrap();
+                        bot.send_message(
+                            dialog.chat_id(),
+                            format!(
+                            "{} {} ({})\n\nСобеседник найден!\n\n/stop - чтобы оставноить диалог",
+                            if interlocutor.gender == Gender::Male {
+                                "🍌"
+                            } else {
+                                "🍑"
+                            },
+                            interlocutor.nickname,
+                            interlocutor.age
+                        ),
+                        )
+                        .await?;
+                        bot.send_message(
+                            ChatId(result),
+                            format!(
+                            "{} {} ({})\n\nСобеседник найден!\n\n/stop - чтобы оставноить диалог",
+                            if user.gender.clone() == Gender::Male {
+                                "🍌"
+                            } else {
+                                "🍑"
+                            },
+                            user.nickname,
+                            user.age
+                        ),
+                        )
+                        .await?;
+                        db.set_user_state(user.id, user_state::UserState::Dialog)
+                            .unwrap();
+                        db.set_user_state(result, user_state::UserState::Dialog)
+                            .unwrap();
+                    }
+                } else {
+                    bot.send_message(dialog.chat_id(), format!("Ой! Голова кружится...",))
+                        .await?;
                 }
             } else {
                 bot.send_message(dialog.chat_id(), format!("Ой! Голова кружится...",))

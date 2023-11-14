@@ -12,6 +12,9 @@ pub enum Command {
     #[command(description = "Поиск")]
     Search,
 
+    #[command(description = "Найти следующего собеседника")]
+    Next,
+
     #[command(description = "Отменить поиск")]
     Cancel,
 

@@ -11,7 +11,12 @@ pub struct User {
     pub state: UserState,
 }
 impl User {
-    pub fn new(id: i64, age: u8, nickname: String, gender: Gender) -> Self {
+    pub fn new(
+        id: i64,
+        age: u8,
+        nickname: String,
+        gender: Gender,
+    ) -> Self {
         Self {
             id: id,
             nickname: nickname,
