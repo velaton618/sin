@@ -15,12 +15,21 @@ use crate::{
 
 pub async fn admin(bot: Bot, _: Dialog, msg: Message) -> HandlerResult {
     let admin = env::var("ADMIN").unwrap();
-    let db = DATABASE.get_or_init(|| TokioMutex::new(Database::new("db.db").unwrap()));
-    let users = db.lock().await.get_all_users().unwrap();
+    let db = Database::new("db.db").unwrap();
+    let total_users = db.get_total_users()?;
+    let female_count = db.get_female_count()?;
+    let male_count = db.get_male_count()?;
+    let total_chats = db.get_total_chats()?;
 
     if msg.chat.id.0.to_string() == admin {
-        bot.send_message(msg.chat.id, format!("Сейчас {} Пользователей", users.len()))
-            .await?;
+        bot.send_message(
+            msg.chat.id,
+            format!(
+                "Users: {}\n🍌 Males: {}\n🍑 Females: {}\n\n🗨️ Chats: {}",
+                total_users, male_count, female_count, total_chats
+            ),
+        )
+        .await?;
     }
 
     Ok(())

@@ -50,6 +50,34 @@ impl Database {
         Ok(Database { connection })
     }
 
+    pub fn get_total_users(&self) -> Result<usize> {
+        let mut stmt = self.connection.prepare("SELECT COUNT(*) FROM users")?;
+        let count: usize = stmt.query_row([], |row| row.get(0))?;
+        Ok(count)
+    }
+
+    pub fn get_female_count(&self) -> Result<usize> {
+        self.get_gender_count(Gender::Female)
+    }
+
+    pub fn get_male_count(&self) -> Result<usize> {
+        self.get_gender_count(Gender::Male)
+    }
+
+    pub fn get_gender_count(&self, gender: Gender) -> Result<usize> {
+        let mut stmt = self
+            .connection
+            .prepare("SELECT COUNT(*) FROM users WHERE gender = ?1")?;
+        let count: usize = stmt.query_row(params![gender.to_string()], |row| row.get(0))?;
+        Ok(count)
+    }
+
+    pub fn get_total_chats(&self) -> Result<usize> {
+        let mut stmt = self.connection.prepare("SELECT COUNT(*) FROM chats")?;
+        let count: usize = stmt.query_row([], |row| row.get(0))?;
+        Ok(count)
+    }
+
     pub fn get_chat(&self, user_id: i64) -> Result<Option<i64>> {
         let mut stmt = self
             .connection
