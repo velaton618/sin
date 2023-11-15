@@ -19,7 +19,7 @@ impl Database {
                   nickname TEXT NOT NULL,
                   age INTEGER NOT NULL,
                   gender TEXT NOT NULL,
-                  search_gender TEXT DEFAULT 0,
+                  search_gender TEXT DEFAULT Male,
                   chat_type INTEGER DEFAULT 0,
                   state INTEGER DEFAULT 0,
                   reputation INTEGER DEFAULT 0,
@@ -325,7 +325,7 @@ impl Database {
     pub fn set_search_gender(&self, user_id: i64, gender: Gender) -> Result<()> {
         self.connection.execute(
             "UPDATE users SET search_gender = ?1 WHERE id = ?2",
-            params![gender as i32, user_id],
+            params![gender.to_string(), user_id],
         )?;
         Ok(())
     }
@@ -365,8 +365,8 @@ impl Database {
         )?;
         let matching_user_id: Result<i64> = stmt.query_row(
             params![
-                search_gender.clone() as i32,
-                searcher_gender.clone() as i32,
+                search_gender.clone().to_string(),
+                searcher_gender.clone().to_string(),
                 chat_type.clone() as i32
             ],
             |row| row.get(0),

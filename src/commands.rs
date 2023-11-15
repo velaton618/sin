@@ -164,6 +164,22 @@ pub async fn user_info(bot: Bot, _: Dialog, msg: Message) -> HandlerResult {
             .unwrap()
             .unwrap();
 
+        bot.send_message(
+            msg.chat.id,
+            format!(
+                "{}\n\nНикнейм: {}\nПол: {}\nВозраст: {}\nРепутация: {}",
+                user.id,
+                user.nickname,
+                if user.gender == Gender::Male {
+                    "🍌"
+                } else {
+                    "🍑"
+                },
+                user.age,
+                user.reputation
+            ),
+        )
+        .await?;
         bot.send_message(msg.chat.id, format!("{:#?}", user))
             .await?;
     } else {
