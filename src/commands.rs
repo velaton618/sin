@@ -376,7 +376,7 @@ pub async fn next(bot: Bot, dialog: Dialog, msg: Message) -> HandlerResult {
                     bot.send_message(
                         dialog.chat_id(),
                         format!(
-                    "{}\n\n{} {} ({})\n\nСобеседник найден!\n\n/stop - чтобы остановить диалог",
+                    "{}\n\n{} {} ({})\n\nСобеседник найден!\n\n/next - чтобы найти нового собеседника\n/stop - чтобы остановить диалог",
                     if user.chat_type == Some(ChatType::Regular) {
                         "💬"
                     } else {
@@ -395,7 +395,7 @@ pub async fn next(bot: Bot, dialog: Dialog, msg: Message) -> HandlerResult {
                     bot.send_message(
                         ChatId(result),
                         format!(
-                    "{}\n\n{} {} ({})\n\nСобеседник найден!\n\n/stop - чтобы остановить диалог",
+                    "{}\n\n{} {} ({})\n\nСобеседник найден!\n\n/next - чтобы найти нового собеседника\n/stop - чтобы остановить диалог",
                     if user.chat_type == Some(ChatType::Regular) {
                         "💬"
                     } else {
