@@ -118,6 +118,9 @@ pub async fn receive_message(bot: Bot, dialog: Dialog, msg: Message) -> HandlerR
                     bot.send_video(ChatId(chat), InputFile::file_id(&video.file.id))
                         .await?;
                 }
+            } else if let Some(animation) = msg.animation() {
+                bot.send_animation(ChatId(chat), InputFile::file_id(&animation.file.id))
+                    .await?;
             } else if let Some(sticker) = msg.sticker() {
                 bot.send_sticker(ChatId(chat), InputFile::file_id(&sticker.file.id))
                     .await?;
