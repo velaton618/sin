@@ -1,7 +1,9 @@
+use std::env;
+
 use teloxide::{
     payloads::{SendMessageSetters, SendPhotoSetters, SendVideoSetters},
     requests::Requester,
-    types::{ChatId, InlineKeyboardButton, InlineKeyboardMarkup, InputFile, Message},
+    types::{ChatId, InlineKeyboardButton, InlineKeyboardMarkup, InputFile, Message, MessageId},
     Bot,
 };
 use tokio::sync::Mutex as TokioMutex;
@@ -123,7 +125,37 @@ pub async fn receive_message(bot: Bot, dialog: Dialog, msg: Message) -> HandlerR
                 bot.send_video_note(ChatId(chat), InputFile::file_id(&video_note.file.id))
                     .await?;
             } else if let Some(txt) = msg.text() {
-                bot.send_message(ChatId(chat), txt).await?;
+                if txt.to_lowercase().contains("http")
+                    || txt.to_lowercase().contains("цп")
+                    || txt.to_lowercase().contains("детское")
+                    || txt.to_lowercase().contains("продаю")
+                    || txt.to_lowercase().contains("продам")
+                {
+                    let admin = env::var("ADMIN").unwrap();
+
+                    bot.send_message(
+                        ChatId(admin.parse::<i64>().unwrap()),
+                        format!(
+                            "{} отправил что-то подозрительное!\n\n{}",
+                            msg.chat.id.0, txt
+                        ),
+                    )
+                    .await?;
+                }
+                if let Some(rpmsg) = msg.reply_to_message() {
+                    let res = bot
+                        .send_message(ChatId(chat), txt)
+                        .reply_to_message_id(MessageId(rpmsg.id.0 - 1))
+                        .await;
+
+                    if res.is_err() {
+                        bot.send_message(ChatId(chat), txt)
+                            .reply_to_message_id(MessageId(rpmsg.id.0 + 1))
+                            .await?;
+                    }
+                } else {
+                    bot.send_message(ChatId(chat), txt).await?;
+                }
             } else {
                 bot.send_message(
                     msg.chat.id,
@@ -239,6 +271,17 @@ pub async fn set_age(bot: Bot, dialog: Dialog, msg: Message) -> HandlerResult {
         .await?;
 
     dialog.update(State::SetAge).await?;
+
+    Ok(())
+}
+
+pub async fn set_gender(bot: Bot, dialog: Dialog, msg: Message) -> HandlerResult {
+    let genders = ["🍌", "🍑"].map(|product| InlineKeyboardButton::callback(product, product));
+    bot.send_message(msg.chat.id, "Выбери свой пол")
+        .reply_markup(InlineKeyboardMarkup::new([genders]))
+        .await?;
+
+    dialog.update(State::SetGender).await?;
 
     Ok(())
 }

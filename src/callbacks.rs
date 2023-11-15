@@ -9,7 +9,6 @@ use tokio::sync::Mutex as TokioMutex;
 
 use crate::{
     database::Database,
-    messages,
     models::{chat_type::ChatType, gender::Gender, user::User},
     state::State,
     user_state::{self, UserState},
@@ -112,6 +111,31 @@ pub async fn search_callback(bot: Bot, dialog: Dialog, q: CallbackQuery) -> Hand
     Ok(())
 }
 
+pub async fn receive_set_gender(bot: Bot, dialog: Dialog, q: CallbackQuery) -> HandlerResult {
+    bot.delete_message(dialog.chat_id(), q.message.clone().unwrap().id)
+        .await?;
+
+    if let Some(g) = &q.data {
+        let db = DATABASE
+            .get_or_init(|| TokioMutex::new(Database::new("db.db").unwrap()))
+            .lock()
+            .await;
+        let gender;
+
+        if g == "🍌" {
+            gender = Gender::Male;
+        } else {
+            gender = Gender::Female;
+        }
+        db.update_user_gender(dialog.chat_id().0, gender).unwrap();
+        bot.send_message(dialog.chat_id(), "Готово!").await?;
+
+        dialog.update(State::Idle).await?;
+    }
+
+    Ok(())
+}
+
 pub async fn reactions_callback(bot: Bot, dialog: Dialog, q: CallbackQuery) -> HandlerResult {
     if let Some(msg) = q.message {
         let _ = bot.delete_message(dialog.chat_id(), msg.id).await;
@@ -120,7 +144,6 @@ pub async fn reactions_callback(bot: Bot, dialog: Dialog, q: CallbackQuery) -> H
     dialog.update(State::Idle).await?;
 
     if let Some(g) = &q.data {
-        println!("G:::{}", g);
         let db = DATABASE
             .get_or_init(|| TokioMutex::new(Database::new("db.db").unwrap()))
             .lock()
@@ -128,8 +151,13 @@ pub async fn reactions_callback(bot: Bot, dialog: Dialog, q: CallbackQuery) -> H
 
         if g.contains("dislike") {
             if let Some(id) = g.split("_").nth(1) {
-                db.decrease_reputation(id.parse::<i64>().unwrap(), 1)
+                let is_ban = db
+                    .decrease_reputation(id.parse::<i64>().unwrap(), 1)
                     .unwrap();
+
+                if is_ban {
+                    bot.send_message(ChatId(id.parse::<i64>().unwrap()), "Ты был заблокирован из-за репутации ниже 20!\n\nЕсли ты уверен что это ошибка, то ты можешь написать сюда @s1nchat_admin").await?;
+                }
             }
         } else {
             if let Some(id) = g.split("_").nth(1) {

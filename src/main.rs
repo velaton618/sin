@@ -20,12 +20,14 @@ use teloxide::{
 use tokio::sync::Mutex as TokioMutex;
 
 use crate::{
-    callbacks::{chat_type_callback, reactions_callback, receive_gender, search_callback},
+    callbacks::{
+        chat_type_callback, reactions_callback, receive_gender, receive_set_gender, search_callback,
+    },
     command::Command,
-    commands::{admin, cancel, idle, stop},
+    commands::{admin, admin_message, ban, cancel, idle, rules, stop, unban, user_info},
     messages::{
         dialog_search, receive_age, receive_message, receive_nickname, receive_set_age,
-        receive_set_nickname, set_age, set_name, start,
+        receive_set_nickname, set_age, set_gender, set_name, start,
     },
 };
 
@@ -83,8 +85,14 @@ fn schema() -> UpdateHandler<Box<dyn std::error::Error + Send + Sync + 'static>>
                 .branch(case![Command::Search].endpoint(dialog_search)),
         )
         .branch(case![Command::SetName].endpoint(set_name))
+        .branch(case![Command::Message].endpoint(admin_message))
         .branch(case![Command::Admin].endpoint(admin))
-        .branch(case![Command::SetAge].endpoint(set_age));
+        .branch(case![Command::Rules].endpoint(rules))
+        .branch(case![Command::Unban].endpoint(unban))
+        .branch(case![Command::Ban].endpoint(ban))
+        .branch(case![Command::UserInfo].endpoint(user_info))
+        .branch(case![Command::SetAge].endpoint(set_age))
+        .branch(case![Command::SetGender].endpoint(set_gender));
 
     let message_handler = Update::filter_message()
         .branch(command_handler)
@@ -103,6 +111,7 @@ fn schema() -> UpdateHandler<Box<dyn std::error::Error + Send + Sync + 'static>>
         .branch(case![State::SearchChooseChatType { gender }].endpoint(chat_type_callback))
         .branch(dptree::case![State::SearchChooseGender])
         .branch(dptree::case![State::Search])
+        .branch(dptree::case![State::SetGender].endpoint(receive_set_gender))
         .branch(case![State::Idle].endpoint(reactions_callback))
         .endpoint(search_callback);
 

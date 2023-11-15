@@ -9,6 +9,8 @@ pub struct Database {
 }
 
 impl Database {
+    const BAN_REPUTATION: i32 = -20;
+
     pub fn new(db_path: &str) -> Result<Self> {
         let connection = Connection::open(db_path)?;
         connection.execute(
@@ -17,6 +19,8 @@ impl Database {
                   nickname TEXT NOT NULL,
                   age INTEGER NOT NULL,
                   gender TEXT NOT NULL,
+                  search_gender TEXT DEFAULT 0,
+                  chat_type INTEGER DEFAULT 0,
                   state INTEGER DEFAULT 0,
                   reputation INTEGER DEFAULT 0,
                   is_banned BOOLEAN DEFAULT 0
@@ -120,24 +124,60 @@ impl Database {
         Ok(count)
     }
 
-    pub fn decrease_reputation(&self, user_id: i64, amount: i32) -> Result<()> {
+    pub fn decrease_reputation(&self, user_id: i64, amount: i32) -> Result<bool> {
         let current_reputation: i32 = self.get_user_reputation(user_id)?;
 
         self.connection.execute(
             "UPDATE users SET reputation = ?1 WHERE id = ?2",
             params![current_reputation - amount, user_id],
         )?;
+
+        if current_reputation - amount <= Self::BAN_REPUTATION {
+            self.connection.execute(
+                "UPDATE users SET is_banned = ?1 WHERE id = ?2",
+                params![true, user_id],
+            )?;
+
+            return Ok(true);
+        }
+        Ok(false)
+    }
+
+    pub fn ban_user(&self, user_id: i64) -> Result<()> {
+        self.connection.execute(
+            "UPDATE users SET is_banned = ?1 WHERE id = ?2",
+            params![true, user_id],
+        )?;
+
         Ok(())
     }
 
-    pub fn increase_reputation(&self, user_id: i64, amount: i32) -> Result<()> {
+    pub fn unban_user(&self, user_id: i64) -> Result<()> {
+        self.connection.execute(
+            "UPDATE users SET is_banned = ?1 WHERE id = ?2",
+            params![false, user_id],
+        )?;
+
+        Ok(())
+    }
+
+    pub fn increase_reputation(&self, user_id: i64, amount: i32) -> Result<bool> {
         let current_reputation: i32 = self.get_user_reputation(user_id)?;
 
         self.connection.execute(
             "UPDATE users SET reputation = ?1 WHERE id = ?2",
             params![current_reputation + amount, user_id],
         )?;
-        Ok(())
+
+        if current_reputation - amount >= Self::BAN_REPUTATION {
+            self.connection.execute(
+                "UPDATE users SET is_banned = ?1 WHERE id = ?2",
+                params![false, user_id],
+            )?;
+
+            return Ok(false);
+        }
+        Ok(true)
     }
 
     fn get_user_reputation(&self, user_id: i64) -> Result<i32> {
@@ -192,8 +232,8 @@ impl Database {
 
     pub fn get_user(&self, user_id: i64) -> Result<Option<User>> {
         let mut stmt = self
-            .connection
-            .prepare("SELECT id, nickname, age, gender, state, reputation, is_banned FROM users WHERE id = ?1")?;
+        .connection
+        .prepare("SELECT id, nickname, age, gender, state, reputation, is_banned, search_gender, chat_type FROM users WHERE id = ?1")?;
         let user = stmt
             .query_row(params![user_id], |row| {
                 let id: i64 = row.get(0)?;
@@ -208,6 +248,12 @@ impl Database {
                 let state = UserState::from(state_int);
                 let reputation: i32 = row.get(5)?;
                 let is_banned: bool = row.get(6)?;
+                let search_gender_str: String = row.get(7)?;
+                let search_gender = match Gender::from_str(&search_gender_str) {
+                    Ok(g) => g,
+                    Err(_) => Gender::Male,
+                };
+                let chat_type: i32 = row.get(8)?;
 
                 Ok(User {
                     id: id,
@@ -217,6 +263,8 @@ impl Database {
                     state,
                     reputation,
                     is_banned,
+                    search_gender: Some(search_gender),
+                    chat_type: Some(ChatType::from(chat_type)),
                 })
             })
             .optional()?;
@@ -225,8 +273,8 @@ impl Database {
 
     pub fn get_all_users(&self) -> Result<Vec<User>> {
         let mut stmt = self
-            .connection
-            .prepare("SELECT id, nickname, age, gender, state, reputation, is_banned FROM users")?;
+        .connection
+        .prepare("SELECT id, nickname, age, gender, state, reputation, is_banned, search_gender, chat_type FROM users")?;
 
         let user_iter = stmt.query_map([], |row| {
             let id: i64 = row.get(0)?;
@@ -239,9 +287,14 @@ impl Database {
             };
             let state_int: i32 = row.get(4)?;
             let state = UserState::from(state_int);
-            let age: u8 = row.get(2)?;
             let reputation: i32 = row.get(5)?;
             let is_banned: bool = row.get(6)?;
+            let search_gender_str: String = row.get(7)?;
+            let search_gender = match Gender::from_str(&search_gender_str) {
+                Ok(g) => g,
+                Err(_) => Gender::Male,
+            };
+            let chat_type: i32 = row.get(8)?;
 
             Ok(User {
                 id: id,
@@ -251,6 +304,8 @@ impl Database {
                 state,
                 reputation,
                 is_banned,
+                search_gender: Some(search_gender),
+                chat_type: Some(ChatType::from(chat_type)),
             })
         })?;
 

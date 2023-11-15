@@ -9,9 +9,183 @@ use teloxide::{
 use tokio::sync::Mutex as TokioMutex;
 
 use crate::{
-    database::Database, messages::receive_message, state::State, user_state::UserState, Dialog,
-    HandlerResult, DATABASE,
+    database::Database, messages::receive_message, models::gender::Gender, state::State,
+    user_state::UserState, Dialog, HandlerResult, DATABASE,
 };
+
+pub async fn admin_message(bot: Bot, _: Dialog, msg: Message) -> HandlerResult {
+    let admin = env::var("ADMIN").unwrap();
+    if msg.chat.id.0.to_string() == admin {}
+
+    let db = DATABASE.get_or_init(|| TokioMutex::new(Database::new("db.db").unwrap()));
+    let users = db.lock().await.get_all_users().unwrap();
+
+    for user in users {
+        let _ = bot
+            .send_message(
+                ChatId(user.id),
+                format!(
+                    "--- SinChat ---\n\n{}",
+                    msg.text().unwrap().split("/message").nth(1).unwrap()
+                ),
+            )
+            .await;
+    }
+
+    Ok(())
+}
+
+pub async fn rules(bot: Bot, _: Dialog, msg: Message) -> HandlerResult {
+    bot.send_message(msg.chat.id, "Что ЗАПРЕЩЕННО в SinChat\n\n💬Общие\nРеклама\nПопрошайничество\nСпам\nНацизм / фашизм / расизм\nБулинг\n\n💬 Обычний чат\nРазговор на темы 18+ \nВыпрашивание интимных фотографий\n\n🔞 Пошлый чат\nОбщаться на НЕ пошлые темы\nИскать друзей\n\nЗа любое нарушение правил ваша репутация снижается, если ваша репутация иже 20, вы будете заблокированы.\n\n⚠️НЕ ЗНАНИЕ ПРАВИЛ, НЕ УБИРАЕТ С ВАС ОТВЕТСВЕННОСТИ⚠️")
+
+        .await?;
+
+    Ok(())
+}
+
+pub async fn ban(bot: Bot, _: Dialog, msg: Message) -> HandlerResult {
+    if let Some(txt) = msg.text() {
+        if txt.split("/ban").nth(1).is_none() {
+            bot.send_message(msg.chat.id, format!("Что-то не так"))
+                .await?;
+            return Ok(());
+        }
+    }
+
+    let admin = env::var("ADMIN").unwrap();
+
+    if msg.chat.id.0.to_string() == admin {
+        let db = Database::new("db.db").unwrap();
+        let user = db
+            .get_user(
+                msg.text()
+                    .unwrap()
+                    .split("/ban")
+                    .nth(1)
+                    .unwrap()
+                    .trim()
+                    .parse::<i64>()
+                    .unwrap(),
+            )
+            .unwrap()
+            .unwrap();
+
+        let id = msg
+            .text()
+            .unwrap_or("/ban")
+            .split("/ban")
+            .nth(1)
+            .unwrap_or("")
+            .trim()
+            .parse::<i64>()
+            .unwrap_or(0);
+        if id != 0 {
+            db.ban_user(id).unwrap();
+            bot.send_message(msg.chat.id, format!("Готово\n\n{:#?}", user))
+                .await?;
+        } else {
+            bot.send_message(msg.chat.id, format!("Что-то не так"))
+                .await?;
+        }
+    }
+
+    Ok(())
+}
+
+pub async fn unban(bot: Bot, _: Dialog, msg: Message) -> HandlerResult {
+    if let Some(txt) = msg.text() {
+        if txt.split("/unban").nth(1).is_none() {
+            bot.send_message(msg.chat.id, format!("Что-то не так"))
+                .await?;
+            return Ok(());
+        }
+    }
+
+    let admin = env::var("ADMIN").unwrap();
+
+    if msg.chat.id.0.to_string() == admin {
+        let db = Database::new("db.db").unwrap();
+        let user = db
+            .get_user(
+                msg.text()
+                    .unwrap()
+                    .split("/unban")
+                    .nth(1)
+                    .unwrap()
+                    .trim()
+                    .parse::<i64>()
+                    .unwrap(),
+            )
+            .unwrap()
+            .unwrap();
+
+        let id = msg
+            .text()
+            .unwrap_or("/unban")
+            .split("/unban")
+            .nth(1)
+            .unwrap_or("")
+            .trim()
+            .parse::<i64>()
+            .unwrap_or(0);
+        if id != 0 {
+            db.unban_user(id).unwrap();
+            bot.send_message(msg.chat.id, format!("Готово\n\n{:#?}", user))
+                .await?;
+        } else {
+            bot.send_message(msg.chat.id, format!("Что-то не так"))
+                .await?;
+        }
+    }
+
+    Ok(())
+}
+
+pub async fn user_info(bot: Bot, _: Dialog, msg: Message) -> HandlerResult {
+    let admin = env::var("ADMIN").unwrap();
+
+    if msg.chat.id.0.to_string() == admin {
+        let db = Database::new("db.db").unwrap();
+        let user = db
+            .get_user(
+                msg.text()
+                    .unwrap_or("/userinfo")
+                    .split("/userinfo")
+                    .nth(1)
+                    .unwrap_or("")
+                    .trim()
+                    .parse::<i64>()
+                    .unwrap_or(msg.chat.id.0),
+            )
+            .unwrap()
+            .unwrap();
+
+        bot.send_message(msg.chat.id, format!("{:#?}", user))
+            .await?;
+    } else {
+        let db = Database::new("db.db").unwrap();
+        let user = db.get_user(msg.chat.id.0).unwrap().unwrap();
+
+        bot.send_message(
+            msg.chat.id,
+            format!(
+                "{}\n\nНикнейм: {}\nПол: {}\nВозраст: {}\nРепутация: {}",
+                user.id,
+                user.nickname,
+                if user.gender == Gender::Male {
+                    "🍌"
+                } else {
+                    "🍑"
+                },
+                user.age,
+                user.reputation
+            ),
+        )
+        .await?;
+    }
+
+    Ok(())
+}
 
 pub async fn admin(bot: Bot, _: Dialog, msg: Message) -> HandlerResult {
     let admin = env::var("ADMIN").unwrap();
@@ -28,7 +202,7 @@ pub async fn admin(bot: Bot, _: Dialog, msg: Message) -> HandlerResult {
         bot.send_message(
             msg.chat.id,
             format!(
-                "Users: {}\n🍌 Males: {}\n🍑 Females: {}\n\n🗨️ Chats: {}\n\nQueue: {}\n\n\n🍌 Queue Males: {}\n🍑 Queue Females: {}",
+                "Users: {}\n🍌 Males: {}\n🍑 Females: {}\n\n💬 Chats: {}\n\nQueue: {}\n\n\n🍌 Queue Males: {}\n🍑 Queue Females: {}",
                 total_users, male_count, female_count, total_chats, total_queue, total_male_queue, total_female_queue
             ),
         )

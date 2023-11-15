@@ -23,4 +23,5 @@ pub enum State {
     Idle,
     SetNickname,
     SetAge,
+    SetGender,
 }
