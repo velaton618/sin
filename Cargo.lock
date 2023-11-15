@@ -1398,7 +1398,7 @@ dependencies = [
 
 [[package]]
 name = "sin"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "dotenv",
  "i18n",

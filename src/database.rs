@@ -322,6 +322,22 @@ impl Database {
         Ok(())
     }
 
+    pub fn set_search_gender(&self, user_id: i64, gender: Gender) -> Result<()> {
+        self.connection.execute(
+            "UPDATE users SET search_gender = ?1 WHERE id = ?2",
+            params![gender as i32, user_id],
+        )?;
+        Ok(())
+    }
+
+    pub fn set_chat_type(&self, user_id: i64, chat_type: ChatType) -> Result<()> {
+        self.connection.execute(
+            "UPDATE users SET chat_type = ?1 WHERE id = ?2",
+            params![chat_type as i32, user_id],
+        )?;
+        Ok(())
+    }
+
     pub fn create_chat(
         &self,
         user_id_one: i64,
@@ -342,6 +358,8 @@ impl Database {
         searcher_gender: Gender,
         chat_type: ChatType,
     ) -> Result<i64> {
+        let _ = self.set_chat_type(user_id, chat_type.clone());
+        let _ = self.set_search_gender(user_id, search_gender);
         let mut stmt = self.connection.prepare(
             "SELECT user_id FROM queue WHERE searcher_gender = ?1 AND search_gender = ?2 AND chat_type = ?3 LIMIT 1",
         )?;
