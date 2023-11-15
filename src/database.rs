@@ -2,6 +2,7 @@ use crate::{
     models::{chat_type::ChatType, gender::Gender, user::User},
     user_state::UserState,
 };
+use log::error;
 use rusqlite::{params, Connection, OptionalExtension, Result};
 
 pub struct Database {
@@ -358,6 +359,7 @@ impl Database {
         searcher_gender: Gender,
         chat_type: ChatType,
     ) -> Result<i64> {
+        println!("{} : {} : {:?}", search_gender, searcher_gender, chat_type);
         let _ = self.set_chat_type(user_id, chat_type.clone());
         let _ = self.set_search_gender(user_id, search_gender);
         let mut stmt = self.connection.prepare(
@@ -365,8 +367,8 @@ impl Database {
         )?;
         let matching_user_id: Result<i64> = stmt.query_row(
             params![
-                search_gender.clone().to_string(),
-                searcher_gender.clone().to_string(),
+                search_gender.clone() as i32,
+                searcher_gender.clone() as i32,
                 chat_type.clone() as i32
             ],
             |row| row.get(0),
@@ -384,7 +386,8 @@ impl Database {
 
                 return Ok(match_id);
             }
-            Err(_) => {
+            Err(e) => {
+                error!("{}", e);
                 self.connection.execute(
                     "INSERT INTO queue (user_id, search_gender, searcher_gender, chat_type) VALUES (?1, ?2, ?3, ?4)",
                     params![user_id, search_gender as i32, searcher_gender as i32, chat_type as i32],
