@@ -283,14 +283,6 @@ impl Database {
         Ok(())
     }
 
-    pub fn get_referral_count(&self, user_id: i64) -> Result<u32> {
-        let mut stmt = self
-            .connection
-            .prepare("SELECT referrals FROM users WHERE id = ?1")?;
-        let referrals: Result<u32> = stmt.query_row(params![user_id], |row| row.get(0));
-        referrals
-    }
-
     pub fn get_top_referral_users(&self, limit: usize) -> Result<Vec<User>> {
         let mut stmt = self.connection.prepare(
         "SELECT id, nickname, age, gender, state, reputation, is_banned, search_gender, chat_type, referrals FROM users ORDER BY referrals DESC LIMIT ?1",
@@ -423,7 +415,6 @@ impl Database {
         searcher_gender: Gender,
         chat_type: ChatType,
     ) -> Result<i64> {
-        println!("{} : {} : {:?}", search_gender, searcher_gender, chat_type);
         let _ = self.set_chat_type(user_id, chat_type.clone());
         let _ = self.set_search_gender(user_id, search_gender);
         let mut stmt = self.connection.prepare(

@@ -191,7 +191,7 @@ pub async fn chat_type_callback(
             .await;
 
         let user = db.get_user(dialog.chat_id().0);
-        debug!("{:?}", user);
+
         if user.is_ok() {
             let user = user.unwrap();
 
@@ -205,18 +205,9 @@ pub async fn chat_type_callback(
                 let result =
                     db.enqueue_user(dialog.chat_id().0, gender, user.gender, chat_type.clone());
 
-                println!("{:?}", result);
-
                 if result.is_ok() {
                     let result = result.unwrap();
                     let cancel = [InlineKeyboardButton::callback("❌ Отменить", "cancel")];
-                    bot.send_message(dialog.chat_id(), "Ищу...")
-                        .reply_markup(InlineKeyboardMarkup::new([cancel]))
-                        .await?;
-                    dialog.update(State::Search).await?;
-
-                    db.set_user_state(user.id, user_state::UserState::Search)
-                        .unwrap();
 
                     if result != 0 {
                         dialog
@@ -268,6 +259,14 @@ pub async fn chat_type_callback(
                         db.set_user_state(user.id, user_state::UserState::Dialog)
                             .unwrap();
                         db.set_user_state(result, user_state::UserState::Dialog)
+                            .unwrap();
+                    } else {
+                        bot.send_message(dialog.chat_id(), "Ищу...")
+                            .reply_markup(InlineKeyboardMarkup::new([cancel]))
+                            .await?;
+                        dialog.update(State::Search).await?;
+
+                        db.set_user_state(user.id, user_state::UserState::Search)
                             .unwrap();
                     }
                 } else {

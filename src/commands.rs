@@ -278,7 +278,7 @@ pub async fn admin(bot: Bot, _: Dialog, msg: Message) -> HandlerResult {
         bot.send_message(
             msg.chat.id,
             format!(
-                "Users: {}\n🍌 Males: {}\n🍑 Females: {}\n\n💬 Chats: {}\n\nQueue: {}\n\n\n🍌 Queue Males: {}\n🍑 Queue Females: {}",
+                "Users: {}\n🍌 Males: {}\n🍑 Females: {}\n\n💬 Chats: {}\nQueue: {}\n\n\n🍌 Queue Males: {}\n🍑 Queue Females: {}",
                 total_users, male_count, female_count, total_chats, total_queue, total_male_queue, total_female_queue
             ),
         )
@@ -409,18 +409,9 @@ pub async fn next(bot: Bot, dialog: Dialog, msg: Message) -> HandlerResult {
                 user.chat_type.as_ref().unwrap().clone(),
             );
 
-            println!("{:?}", result);
-
             if result.is_ok() {
                 let result = result.unwrap();
                 let cancel = [InlineKeyboardButton::callback("❌ Отменить", "cancel")];
-                bot.send_message(dialog.chat_id(), "Ищу...")
-                    .reply_markup(InlineKeyboardMarkup::new([cancel]))
-                    .await?;
-                dialog.update(State::Search).await?;
-
-                db.set_user_state(user.id, user_state::UserState::Search)
-                    .unwrap();
 
                 if result != 0 {
                     dialog
@@ -473,6 +464,14 @@ pub async fn next(bot: Bot, dialog: Dialog, msg: Message) -> HandlerResult {
                         .unwrap();
                     db.set_user_state(result, user_state::UserState::Dialog)
                         .unwrap();
+                } else {
+                    bot.send_message(dialog.chat_id(), "Ищу...")
+                        .reply_markup(InlineKeyboardMarkup::new([cancel]))
+                        .await?;
+                    dialog.update(State::Search).await?;
+
+                    db.set_user_state(user.id, user_state::UserState::Search)
+                        .unwrap();
                 }
             } else {
                 bot.send_message(dialog.chat_id(), format!("Ой! Голова кружится...",))
@@ -505,7 +504,7 @@ pub async fn start(bot: Bot, dialog: Dialog, msg: Message) -> HandlerResult {
                         let user = user.unwrap();
                         let u = db.get_user(msg.chat.id.0);
 
-                        if u.is_err() {
+                        if u.is_err() || u.unwrap().is_none() {
                             let _ = db.increase_referral_count(user.id);
                             let _ = bot
                                 .send_message(

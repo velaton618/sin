@@ -46,7 +46,7 @@ async fn initilize() {
 
     let token = env::var("TELOXIDE_TOKEN").unwrap();
     env::set_var("TELOXIDE_TOKEN", token);
-    env::set_var("RUST_LOG", "debug");
+    env::set_var("RUST_LOG", "warn");
 
     pretty_env_logger::init();
     log::info!("Starting bot...");
@@ -61,11 +61,11 @@ async fn main() {
 
     let bot = Bot::from_env();
 
-    for user in users {
-        let _ = bot
-            .send_message(ChatId(user.id), "Наш бот перезагрузился")
-            .await;
-    }
+    // for user in users {
+    //     let _ = bot
+    //         .send_message(ChatId(user.id), "Наш бот перезагрузился")
+    //         .await;
+    // }
 
     Dispatcher::builder(bot, schema())
         .dependencies(dptree::deps![InMemStorage::<State>::new()])
