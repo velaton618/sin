@@ -234,30 +234,6 @@ pub async fn dialog_search(bot: Bot, dialog: Dialog, _: Message) -> HandlerResul
     Ok(())
 }
 
-pub async fn start(bot: Bot, dialog: Dialog, msg: Message) -> HandlerResult {
-    let db = DATABASE
-        .get_or_init(|| TokioMutex::new(Database::new("db.db").unwrap()))
-        .lock()
-        .await;
-
-    let user = db.get_user(dialog.chat_id().0);
-
-    if user.is_ok() && user.as_ref().unwrap().is_some() {
-        idle(bot, dialog, msg).await?;
-    } else {
-        bot.send_message(msg.chat.id, "Добро пожаловать в анонимный чат Sin!")
-            .await?;
-        bot.send_message(
-            msg.chat.id,
-            "Нужно зарегестрироваться! Введи свой возраст: ",
-        )
-        .await?;
-        dialog.update(State::ReceiveAge).await?;
-    }
-
-    Ok(())
-}
-
 pub async fn set_name(bot: Bot, dialog: Dialog, msg: Message) -> HandlerResult {
     bot.send_message(
         msg.chat.id,

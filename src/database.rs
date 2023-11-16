@@ -24,7 +24,8 @@ impl Database {
                   chat_type INTEGER DEFAULT 0,
                   state INTEGER DEFAULT 0,
                   reputation INTEGER DEFAULT 0,
-                  is_banned BOOLEAN DEFAULT 0
+                  is_banned BOOLEAN DEFAULT 0,
+                  referrals INTEGER DEFAULT 0
                   )",
             [],
         )?;
@@ -234,7 +235,7 @@ impl Database {
     pub fn get_user(&self, user_id: i64) -> Result<Option<User>> {
         let mut stmt = self
         .connection
-        .prepare("SELECT id, nickname, age, gender, state, reputation, is_banned, search_gender, chat_type FROM users WHERE id = ?1")?;
+        .prepare("SELECT id, nickname, age, gender, state, reputation, is_banned, search_gender, chat_type, referrals FROM users WHERE id = ?1")?;
         let user = stmt
             .query_row(params![user_id], |row| {
                 let id: i64 = row.get(0)?;
@@ -255,6 +256,7 @@ impl Database {
                     Err(_) => Gender::Male,
                 };
                 let chat_type: i32 = row.get(8)?;
+                let referrals: u32 = row.get(9)?;
 
                 Ok(User {
                     id: id,
@@ -266,16 +268,76 @@ impl Database {
                     is_banned,
                     search_gender: Some(search_gender),
                     chat_type: Some(ChatType::from(chat_type)),
+                    referrals: referrals,
                 })
             })
             .optional()?;
         Ok(user)
     }
 
+    pub fn increase_referral_count(&self, user_id: i64) -> Result<()> {
+        self.connection.execute(
+            "UPDATE users SET referrals = referrals + 1 WHERE id = ?1",
+            params![user_id],
+        )?;
+        Ok(())
+    }
+
+    pub fn get_referral_count(&self, user_id: i64) -> Result<u32> {
+        let mut stmt = self
+            .connection
+            .prepare("SELECT referrals FROM users WHERE id = ?1")?;
+        let referrals: Result<u32> = stmt.query_row(params![user_id], |row| row.get(0));
+        referrals
+    }
+
+    pub fn get_top_referral_users(&self, limit: usize) -> Result<Vec<User>> {
+        let mut stmt = self.connection.prepare(
+        "SELECT id, nickname, age, gender, state, reputation, is_banned, search_gender, chat_type, referrals FROM users ORDER BY referrals DESC LIMIT ?1",
+    )?;
+        let user_iter = stmt.query_map(params![limit as i64], |row| {
+            let id: i64 = row.get(0)?;
+            let nickname: String = row.get(1)?;
+            let age: u8 = row.get(2)?;
+            let gender_str: String = row.get(3)?;
+            let gender = match Gender::from_str(&gender_str) {
+                Ok(g) => g,
+                Err(_) => Gender::Male,
+            };
+            let state_int: i32 = row.get(4)?;
+            let state = UserState::from(state_int);
+            let reputation: i32 = row.get(5)?;
+            let is_banned: bool = row.get(6)?;
+            let search_gender_str: String = row.get(7)?;
+            let search_gender = match Gender::from_str(&search_gender_str) {
+                Ok(g) => g,
+                Err(_) => Gender::Male,
+            };
+            let chat_type: i32 = row.get(8)?;
+            let referrals: u32 = row.get(9)?;
+
+            Ok(User {
+                id,
+                nickname,
+                age,
+                gender,
+                state,
+                reputation,
+                is_banned,
+                search_gender: Some(search_gender),
+                chat_type: Some(ChatType::from(chat_type)),
+                referrals,
+            })
+        })?;
+
+        let users: Result<Vec<User>> = user_iter.collect();
+        Ok(users?)
+    }
+
     pub fn get_all_users(&self) -> Result<Vec<User>> {
         let mut stmt = self
         .connection
-        .prepare("SELECT id, nickname, age, gender, state, reputation, is_banned, search_gender, chat_type FROM users")?;
+        .prepare("SELECT id, nickname, age, gender, state, reputation, is_banned, search_gender, chat_type, referrals FROM users")?;
 
         let user_iter = stmt.query_map([], |row| {
             let id: i64 = row.get(0)?;
@@ -296,6 +358,7 @@ impl Database {
                 Err(_) => Gender::Male,
             };
             let chat_type: i32 = row.get(8)?;
+            let referrals: u32 = row.get(9)?;
 
             Ok(User {
                 id: id,
@@ -307,6 +370,7 @@ impl Database {
                 is_banned,
                 search_gender: Some(search_gender),
                 chat_type: Some(ChatType::from(chat_type)),
+                referrals: referrals,
             })
         })?;
 

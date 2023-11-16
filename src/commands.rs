@@ -145,6 +145,60 @@ pub async fn unban(bot: Bot, _: Dialog, msg: Message) -> HandlerResult {
     Ok(())
 }
 
+pub async fn referral(bot: Bot, _: Dialog, msg: Message) -> HandlerResult {
+    let link = format!("https://t.me/s1nchat_bot?start={}", msg.chat.id.0);
+    bot.send_message(
+        msg.chat.id,
+        format!("Твоя реферальная ссылка: {}\n\nПример использования:", link),
+    )
+    .await?;
+
+    bot.send_message(
+        msg.chat.id,
+        format!(
+            "💫 Анонимный чат с бесплатным поиском по полу, и разделением чатов!\n\n👻Скорее регистрируйся по этой ссылке чтобы найти хорошего собеседника!\n\n{}",
+            link
+        ),
+    )
+    .await?;
+
+    Ok(())
+}
+
+pub async fn top(bot: Bot, _: Dialog, msg: Message) -> HandlerResult {
+    let db = DATABASE.get().unwrap().lock().await;
+    let users = db.get_top_referral_users(20);
+    if users.is_ok() {
+        let users = users.unwrap();
+        let mut response = String::new();
+        response.push_str("💫ТОП 10 ПО РЕФЕРАЛАМ\n\n");
+
+        for user in users {
+            response.push_str(&format!(
+                "{} {} » {}\n",
+                if user.gender == Gender::Male {
+                    "🍌"
+                } else {
+                    "🍑"
+                },
+                user.nickname,
+                user.referrals
+            ));
+        }
+        bot.send_message(msg.chat.id, &response).await?;
+        bot.send_message(msg.chat.id, "/referral - чтобы попасть в этот топ")
+            .await?;
+    } else {
+        bot.send_message(
+            msg.chat.id,
+            "Что-то пошло не так... Обратитесь в администрацию",
+        )
+        .await?;
+    }
+
+    Ok(())
+}
+
 pub async fn user_info(bot: Bot, _: Dialog, msg: Message) -> HandlerResult {
     let admin = env::var("ADMIN").unwrap();
 
@@ -167,7 +221,7 @@ pub async fn user_info(bot: Bot, _: Dialog, msg: Message) -> HandlerResult {
         bot.send_message(
             msg.chat.id,
             format!(
-                "{}\n\nНикнейм: {}\nПол: {}\nВозраст: {}\nРепутация: {}",
+                "{}\n\nНикнейм: {}\nПол: {}\nВозраст: {}\nРепутация: {}\nКоличество приглашенных людей: {}",
                 user.id,
                 user.nickname,
                 if user.gender == Gender::Male {
@@ -176,7 +230,8 @@ pub async fn user_info(bot: Bot, _: Dialog, msg: Message) -> HandlerResult {
                     "🍑"
                 },
                 user.age,
-                user.reputation
+                user.reputation,
+                user.referrals
             ),
         )
         .await?;
@@ -189,7 +244,7 @@ pub async fn user_info(bot: Bot, _: Dialog, msg: Message) -> HandlerResult {
         bot.send_message(
             msg.chat.id,
             format!(
-                "{}\n\nНикнейм: {}\nПол: {}\nВозраст: {}\nРепутация: {}",
+                "{}\n\nНикнейм: {}\nПол: {}\nВозраст: {}\nРепутация: {}\nКоличество приглашенных людей: {}",
                 user.id,
                 user.nickname,
                 if user.gender == Gender::Male {
@@ -198,7 +253,8 @@ pub async fn user_info(bot: Bot, _: Dialog, msg: Message) -> HandlerResult {
                     "🍑"
                 },
                 user.age,
-                user.reputation
+                user.reputation,
+                user.referrals
             ),
         )
         .await?;
@@ -426,6 +482,60 @@ pub async fn next(bot: Bot, dialog: Dialog, msg: Message) -> HandlerResult {
     Ok(())
 }
 
+pub async fn start(bot: Bot, dialog: Dialog, msg: Message) -> HandlerResult {
+    let db = DATABASE
+        .get_or_init(|| TokioMutex::new(Database::new("db.db").unwrap()))
+        .lock()
+        .await;
+
+    if let Some(txt) = msg.text() {
+        println!("{}", txt);
+        if let Some(id) = txt.split("/start").nth(1) {
+            println!("{}", id);
+            let id = id.trim().parse::<i64>();
+            println!("{:?}", id);
+            if id.is_ok() {
+                let id = id.unwrap();
+
+                let user = db.get_user(id);
+                println!("{:?}", user);
+                if user.is_ok() {
+                    let user = user.unwrap();
+
+                    if user.is_some() {
+                        let user = user.unwrap();
+
+                        let a = db.increase_referral_count(user.id);
+                        println!("{:?}", a);
+                        let _ = bot
+                            .send_message(
+                                ChatId(user.id),
+                                "По вашей реферальной ссылке перешёл 1 человек!",
+                            )
+                            .await;
+                    }
+                }
+            }
+        }
+    }
+
+    let user = db.get_user(dialog.chat_id().0);
+
+    if user.is_ok() && user.as_ref().unwrap().is_some() {
+        idle(bot, dialog, msg).await?;
+    } else {
+        bot.send_message(msg.chat.id, "Добро пожаловать в анонимный чат Sin!")
+            .await?;
+        bot.send_message(
+            msg.chat.id,
+            "Нужно зарегестрироваться! Введи свой возраст: ",
+        )
+        .await?;
+        dialog.update(State::ReceiveAge).await?;
+    }
+
+    Ok(())
+}
 pub async fn idle(bot: Bot, dialog: Dialog, msg: Message) -> HandlerResult {
     if let Some(txt) = msg.text() {
         if txt.contains("search") {

@@ -24,10 +24,13 @@ use crate::{
         chat_type_callback, reactions_callback, receive_gender, receive_set_gender, search_callback,
     },
     command::Command,
-    commands::{admin, admin_message, ban, cancel, idle, next, rules, stop, unban, user_info},
+    commands::{
+        admin, admin_message, ban, cancel, idle, next, referral, rules, start, stop, top, unban,
+        user_info,
+    },
     messages::{
         dialog_search, receive_age, receive_message, receive_nickname, receive_set_age,
-        receive_set_nickname, set_age, set_gender, set_name, start,
+        receive_set_nickname, set_age, set_gender, set_name,
     },
 };
 
@@ -81,6 +84,8 @@ fn schema() -> UpdateHandler<Box<dyn std::error::Error + Send + Sync + 'static>>
         .branch(case![Command::Search].endpoint(idle))
         .branch(case![Command::Next].endpoint(next))
         .branch(case![Command::Cancel].endpoint(cancel))
+        .branch(case![Command::Referral].endpoint(referral))
+        .branch(case![Command::Top].endpoint(top))
         .branch(
             case![State::Dialog { interlocutor }]
                 .branch(case![Command::Search].endpoint(dialog_search)),

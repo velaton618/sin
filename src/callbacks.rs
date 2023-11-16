@@ -38,7 +38,7 @@ pub async fn receive_gender(
             .lock()
             .await;
 
-        db.add_user(&user).unwrap();
+        let _ = db.add_user(&user);
 
         bot.send_message(
             dialog.chat_id(),

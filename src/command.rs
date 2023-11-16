@@ -47,4 +47,10 @@ pub enum Command {
 
     #[command(description = "Получить информацию о пользователе")]
     UserInfo,
+
+    #[command(description = "Получить реферальную ссылку")]
+    Referral,
+
+    #[command(description = "Топ по рефералам")]
+    Top,
 }

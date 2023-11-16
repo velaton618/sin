@@ -13,6 +13,7 @@ pub struct User {
     pub state: UserState,
     pub reputation: i32,
     pub is_banned: bool,
+    pub referrals: u32,
 }
 impl User {
     pub fn new(id: i64, age: u8, nickname: String, gender: Gender) -> Self {
@@ -26,6 +27,7 @@ impl User {
             state: UserState::Default,
             reputation: 0,
             is_banned: false,
+            referrals: 0,
         }
     }
 }
