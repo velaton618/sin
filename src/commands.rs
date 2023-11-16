@@ -491,30 +491,29 @@ pub async fn start(bot: Bot, dialog: Dialog, msg: Message) -> HandlerResult {
         .await;
 
     if let Some(txt) = msg.text() {
-        println!("{}", txt);
         if let Some(id) = txt.split("/start").nth(1) {
-            println!("{}", id);
             let id = id.trim().parse::<i64>();
-            println!("{:?}", id);
+
             if id.is_ok() {
                 let id = id.unwrap();
 
                 let user = db.get_user(id);
-                println!("{:?}", user);
                 if user.is_ok() {
                     let user = user.unwrap();
 
                     if user.is_some() {
                         let user = user.unwrap();
+                        let u = db.get_user(msg.chat.id.0);
 
-                        let a = db.increase_referral_count(user.id);
-                        println!("{:?}", a);
-                        let _ = bot
-                            .send_message(
-                                ChatId(user.id),
-                                "По вашей реферальной ссылке перешёл 1 человек!",
-                            )
-                            .await;
+                        if u.is_err() {
+                            let _ = db.increase_referral_count(user.id);
+                            let _ = bot
+                                .send_message(
+                                    ChatId(user.id),
+                                    "По вашей реферальной ссылке перешёл 1 человек!",
+                                )
+                                .await;
+                        }
                     }
                 }
             }
