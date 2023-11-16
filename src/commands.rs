@@ -167,7 +167,7 @@ pub async fn referral(bot: Bot, _: Dialog, msg: Message) -> HandlerResult {
 
 pub async fn top(bot: Bot, _: Dialog, msg: Message) -> HandlerResult {
     let db = DATABASE.get().unwrap().lock().await;
-    let users = db.get_top_referral_users(20);
+    let users = db.get_top_referral_users(10);
     if users.is_ok() {
         let users = users.unwrap();
         let mut response = String::new();
@@ -188,6 +188,38 @@ pub async fn top(bot: Bot, _: Dialog, msg: Message) -> HandlerResult {
         bot.send_message(msg.chat.id, &response).await?;
         bot.send_message(msg.chat.id, "/referral - чтобы попасть в этот топ")
             .await?;
+    } else {
+        bot.send_message(
+            msg.chat.id,
+            "Что-то пошло не так... Обратитесь в администрацию",
+        )
+        .await?;
+    }
+
+    Ok(())
+}
+
+pub async fn top_rep(bot: Bot, _: Dialog, msg: Message) -> HandlerResult {
+    let db = DATABASE.get().unwrap().lock().await;
+    let users = db.get_top_reputation_users(10);
+    if users.is_ok() {
+        let users = users.unwrap();
+        let mut response = String::new();
+        response.push_str("💫ТОП 10 ПО РЕПУТАЦИИ\n\n");
+
+        for user in users {
+            response.push_str(&format!(
+                "{} {} » {}\n",
+                if user.gender == Gender::Male {
+                    "🍌"
+                } else {
+                    "🍑"
+                },
+                user.nickname,
+                user.reputation
+            ));
+        }
+        bot.send_message(msg.chat.id, &response).await?;
     } else {
         bot.send_message(
             msg.chat.id,

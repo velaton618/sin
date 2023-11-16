@@ -53,4 +53,7 @@ pub enum Command {
 
     #[command(description = "Топ по рефералам")]
     Top,
+
+    #[command(description = "Топ по репутации")]
+    TopRep,
 }

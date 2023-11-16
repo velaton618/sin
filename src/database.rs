@@ -326,6 +326,49 @@ impl Database {
         Ok(users?)
     }
 
+    pub fn get_top_reputation_users(&self, limit: usize) -> Result<Vec<User>> {
+        let mut stmt = self.connection.prepare(
+        "SELECT id, nickname, age, gender, state, reputation, is_banned, search_gender, chat_type, referrals FROM users ORDER BY reputation DESC LIMIT ?1",
+    )?;
+        let user_iter = stmt.query_map(params![limit as i64], |row| {
+            let id: i64 = row.get(0)?;
+            let nickname: String = row.get(1)?;
+            let age: u8 = row.get(2)?;
+            let gender_str: String = row.get(3)?;
+            let gender = match Gender::from_str(&gender_str) {
+                Ok(g) => g,
+                Err(_) => Gender::Male,
+            };
+            let state_int: i32 = row.get(4)?;
+            let state = UserState::from(state_int);
+            let reputation: i32 = row.get(5)?;
+            let is_banned: bool = row.get(6)?;
+            let search_gender_str: String = row.get(7)?;
+            let search_gender = match Gender::from_str(&search_gender_str) {
+                Ok(g) => g,
+                Err(_) => Gender::Male,
+            };
+            let chat_type: i32 = row.get(8)?;
+            let referrals: u32 = row.get(9)?;
+
+            Ok(User {
+                id,
+                nickname,
+                age,
+                gender,
+                state,
+                reputation,
+                is_banned,
+                search_gender: Some(search_gender),
+                chat_type: Some(ChatType::from(chat_type)),
+                referrals,
+            })
+        })?;
+
+        let users: Result<Vec<User>> = user_iter.collect();
+        Ok(users?)
+    }
+
     pub fn get_all_users(&self) -> Result<Vec<User>> {
         let mut stmt = self
         .connection
