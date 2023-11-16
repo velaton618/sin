@@ -326,6 +326,15 @@ impl Database {
         Ok(users?)
     }
 
+    pub fn delete_user_by_id(&self, user_id: i64) -> Result<()> {
+        self.connection
+            .execute("DELETE FROM users WHERE id = ?1", params![user_id])?;
+        let _ = self.delete_chat(user_id);
+        let _ = self.dequeue_user(user_id);
+
+        Ok(())
+    }
+
     pub fn get_top_reputation_users(&self, limit: usize) -> Result<Vec<User>> {
         let mut stmt = self.connection.prepare(
         "SELECT id, nickname, age, gender, state, reputation, is_banned, search_gender, chat_type, referrals FROM users ORDER BY reputation DESC LIMIT ?1",

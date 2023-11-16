@@ -25,8 +25,8 @@ use crate::{
     },
     command::Command,
     commands::{
-        admin, admin_message, ban, cancel, idle, next, referral, rules, start, stop, top, top_rep,
-        unban, user_info,
+        admin, admin_message, ban, cancel, delete_user, idle, next, referral, rules, start, stop,
+        top, top_rep, unban, user_info,
     },
     messages::{
         dialog_search, receive_age, receive_message, receive_nickname, receive_set_age,
@@ -93,6 +93,7 @@ fn schema() -> UpdateHandler<Box<dyn std::error::Error + Send + Sync + 'static>>
         )
         .branch(case![Command::SetName].endpoint(set_name))
         .branch(case![Command::Message].endpoint(admin_message))
+        .branch(case![Command::Delete].endpoint(delete_user))
         .branch(case![Command::Admin].endpoint(admin))
         .branch(case![Command::Rules].endpoint(rules))
         .branch(case![Command::Unban].endpoint(unban))

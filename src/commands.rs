@@ -60,36 +60,41 @@ pub async fn ban(bot: Bot, _: Dialog, msg: Message) -> HandlerResult {
 
     if msg.chat.id.0.to_string() == admin {
         let db = Database::new("db.db").unwrap();
-        let user = db
-            .get_user(
-                msg.text()
-                    .unwrap()
+        let user = db.get_user(
+            msg.text()
+                .unwrap()
+                .split("/ban")
+                .nth(1)
+                .unwrap()
+                .trim()
+                .parse::<i64>()
+                .unwrap(),
+        );
+
+        if user.is_ok() {
+            let user = user.unwrap();
+
+            if user.is_some() {
+                let user = user.unwrap();
+
+                let id = msg
+                    .text()
+                    .unwrap_or("/ban")
                     .split("/ban")
                     .nth(1)
-                    .unwrap()
+                    .unwrap_or("")
                     .trim()
                     .parse::<i64>()
-                    .unwrap(),
-            )
-            .unwrap()
-            .unwrap();
-
-        let id = msg
-            .text()
-            .unwrap_or("/ban")
-            .split("/ban")
-            .nth(1)
-            .unwrap_or("")
-            .trim()
-            .parse::<i64>()
-            .unwrap_or(0);
-        if id != 0 {
-            db.ban_user(id).unwrap();
-            bot.send_message(msg.chat.id, format!("Готово\n\n{:#?}", user))
-                .await?;
-        } else {
-            bot.send_message(msg.chat.id, format!("Что-то не так"))
-                .await?;
+                    .unwrap_or(0);
+                if id != 0 {
+                    db.ban_user(id).unwrap();
+                    bot.send_message(msg.chat.id, format!("Готово\n\n{:#?}", user))
+                        .await?;
+                } else {
+                    bot.send_message(msg.chat.id, format!("Что-то не так"))
+                        .await?;
+                }
+            }
         }
     }
 
@@ -109,36 +114,41 @@ pub async fn unban(bot: Bot, _: Dialog, msg: Message) -> HandlerResult {
 
     if msg.chat.id.0.to_string() == admin {
         let db = Database::new("db.db").unwrap();
-        let user = db
-            .get_user(
-                msg.text()
-                    .unwrap()
+        let user = db.get_user(
+            msg.text()
+                .unwrap()
+                .split("/unban")
+                .nth(1)
+                .unwrap()
+                .trim()
+                .parse::<i64>()
+                .unwrap(),
+        );
+
+        if user.is_ok() {
+            let user = user.unwrap();
+
+            if user.is_some() {
+                let user = user.unwrap();
+
+                let id = msg
+                    .text()
+                    .unwrap_or("/unban")
                     .split("/unban")
                     .nth(1)
-                    .unwrap()
+                    .unwrap_or("")
                     .trim()
                     .parse::<i64>()
-                    .unwrap(),
-            )
-            .unwrap()
-            .unwrap();
-
-        let id = msg
-            .text()
-            .unwrap_or("/unban")
-            .split("/unban")
-            .nth(1)
-            .unwrap_or("")
-            .trim()
-            .parse::<i64>()
-            .unwrap_or(0);
-        if id != 0 {
-            db.unban_user(id).unwrap();
-            bot.send_message(msg.chat.id, format!("Готово\n\n{:#?}", user))
-                .await?;
-        } else {
-            bot.send_message(msg.chat.id, format!("Что-то не так"))
-                .await?;
+                    .unwrap_or(0);
+                if id != 0 {
+                    db.unban_user(id).unwrap();
+                    bot.send_message(msg.chat.id, format!("Готово\n\n{:#?}", user))
+                        .await?;
+                } else {
+                    bot.send_message(msg.chat.id, format!("Что-то не так"))
+                        .await?;
+                }
+            }
         }
     }
 
@@ -236,21 +246,24 @@ pub async fn user_info(bot: Bot, _: Dialog, msg: Message) -> HandlerResult {
 
     if msg.chat.id.0.to_string() == admin {
         let db = Database::new("db.db").unwrap();
-        let user = db
-            .get_user(
-                msg.text()
-                    .unwrap_or("/userinfo")
-                    .split("/userinfo")
-                    .nth(1)
-                    .unwrap_or("")
-                    .trim()
-                    .parse::<i64>()
-                    .unwrap_or(msg.chat.id.0),
-            )
-            .unwrap()
-            .unwrap();
+        let user = db.get_user(
+            msg.text()
+                .unwrap_or("/userinfo")
+                .split("/userinfo")
+                .nth(1)
+                .unwrap_or("")
+                .trim()
+                .parse::<i64>()
+                .unwrap_or(msg.chat.id.0),
+        );
 
-        bot.send_message(
+        if user.is_ok() {
+            let user = user.unwrap();
+
+            if user.is_some() {
+                let user = user.unwrap();
+
+                bot.send_message(
             msg.chat.id,
             format!(
                 "{}\n\nНикнейм: {}\nПол: {}\nВозраст: {}\nРепутация: {}\nКоличество приглашенных людей: {}",
@@ -267,8 +280,10 @@ pub async fn user_info(bot: Bot, _: Dialog, msg: Message) -> HandlerResult {
             ),
         )
         .await?;
-        bot.send_message(msg.chat.id, format!("{:#?}", user))
-            .await?;
+                bot.send_message(msg.chat.id, format!("{:#?}", user))
+                    .await?;
+            }
+        }
     } else {
         let db = Database::new("db.db").unwrap();
         let user = db.get_user(msg.chat.id.0).unwrap().unwrap();
@@ -295,6 +310,59 @@ pub async fn user_info(bot: Bot, _: Dialog, msg: Message) -> HandlerResult {
     Ok(())
 }
 
+pub async fn delete_user(bot: Bot, _: Dialog, msg: Message) -> HandlerResult {
+    if let Some(txt) = msg.text() {
+        if txt.split("/delete").nth(1).is_none() {
+            bot.send_message(msg.chat.id, format!("Что-то не так"))
+                .await?;
+            return Ok(());
+        }
+    }
+
+    let admin = env::var("ADMIN").unwrap();
+
+    if msg.chat.id.0.to_string() == admin {
+        let db = Database::new("db.db").unwrap();
+        let user = db.get_user(
+            msg.text()
+                .unwrap()
+                .split("/delete")
+                .nth(1)
+                .unwrap()
+                .trim()
+                .parse::<i64>()
+                .unwrap(),
+        );
+
+        if user.is_ok() {
+            let user = user.unwrap();
+
+            if user.is_some() {
+                let user = user.unwrap();
+
+                let id = msg
+                    .text()
+                    .unwrap_or("/delete")
+                    .split("/delete")
+                    .nth(1)
+                    .unwrap_or("")
+                    .trim()
+                    .parse::<i64>()
+                    .unwrap_or(0);
+                if id != 0 {
+                    db.delete_user_by_id(id).unwrap();
+                    bot.send_message(msg.chat.id, format!("Готово\n\n{:#?}", user))
+                        .await?;
+                } else {
+                    bot.send_message(msg.chat.id, format!("Что-то не так"))
+                        .await?;
+                }
+            }
+        }
+    }
+
+    Ok(())
+}
 pub async fn admin(bot: Bot, _: Dialog, msg: Message) -> HandlerResult {
     let admin = env::var("ADMIN").unwrap();
     let db = Database::new("db.db").unwrap();
