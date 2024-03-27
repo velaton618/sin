@@ -10,27 +10,31 @@ mod user_state;
 use database::Database;
 use state::State;
 use std::env;
-use teloxide::{
-    dispatching::{
-        dialogue::{self, InMemStorage},
-        UpdateHandler,
-    },
-    prelude::*,
-};
+use teloxide::{ dispatching::{ dialogue::{ self, InMemStorage }, UpdateHandler }, prelude::* };
 use tokio::sync::Mutex as TokioMutex;
 
 use crate::{
     callbacks::{
-        chat_type_callback, reactions_callback, receive_gender, receive_set_gender, search_callback,
+        chat_type_callback,
+        reactions_callback,
+        receive_gender,
+        receive_set_gender,
+        search_callback,
     },
     command::Command,
     commands::{
-        admin, admin_message, ban, cancel, delete_user, idle, next, referral, rules, start, stop,
-        top, top_rep, unban, user_info,
+        admin, admin_message, ban, cancel, delete_user, idle, next, premium, referral, rules, start, stop, top, top_rep, unban, user_info
     },
     messages::{
-        dialog_search, receive_age, receive_message, receive_nickname, receive_set_age,
-        receive_set_nickname, set_age, set_gender, set_name,
+        dialog_search,
+        receive_age,
+        receive_message,
+        receive_nickname,
+        receive_set_age,
+        receive_set_nickname,
+        set_age,
+        set_gender,
+        set_name,
     },
 };
 
@@ -71,14 +75,14 @@ async fn main() {
         .dependencies(dptree::deps![InMemStorage::<State>::new()])
         .enable_ctrlc_handler()
         .build()
-        .dispatch()
-        .await;
+        .dispatch().await;
 }
 
 fn schema() -> UpdateHandler<Box<dyn std::error::Error + Send + Sync + 'static>> {
     use dptree::case;
 
-    let command_handler = teloxide::filter_command::<Command, _>()
+    let command_handler = teloxide
+        ::filter_command::<Command, _>()
         .branch(case![Command::Start].endpoint(start))
         .branch(case![State::Dialog { interlocutor }].branch(case![Command::Stop].endpoint(stop)))
         .branch(case![Command::Search].endpoint(idle))
@@ -87,9 +91,11 @@ fn schema() -> UpdateHandler<Box<dyn std::error::Error + Send + Sync + 'static>>
         .branch(case![Command::Referral].endpoint(referral))
         .branch(case![Command::Top].endpoint(top))
         .branch(case![Command::TopRep].endpoint(top_rep))
+        .branch(case![Command::Premium].endpoint(premium))
         .branch(
-            case![State::Dialog { interlocutor }]
-                .branch(case![Command::Search].endpoint(dialog_search)),
+            case![State::Dialog { interlocutor }].branch(
+                case![Command::Search].endpoint(dialog_search)
+            )
         )
         .branch(case![Command::SetName].endpoint(set_name))
         .branch(case![Command::Message].endpoint(admin_message))
@@ -123,7 +129,8 @@ fn schema() -> UpdateHandler<Box<dyn std::error::Error + Send + Sync + 'static>>
         .branch(case![State::Idle].endpoint(reactions_callback))
         .endpoint(search_callback);
 
-    dialogue::enter::<Update, InMemStorage<State>, State, _>()
+    dialogue
+        ::enter::<Update, InMemStorage<State>, State, _>()
         .branch(message_handler)
         .branch(callback_query_handler)
 }

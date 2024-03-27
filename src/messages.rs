@@ -186,7 +186,7 @@ pub async fn receive_age(bot: Bot, dialog: Dialog, msg: Message) -> HandlerResul
 pub async fn receive_nickname(bot: Bot, dialog: Dialog, msg: Message, age: u8) -> HandlerResult {
     match msg.text().map(ToOwned::to_owned) {
         Some(nickname) => {
-            let genders = ["♂", "♀"].map(|product|
+            let genders = ["Мужской ♂", "Женский ♀"].map(|product|
                 InlineKeyboardButton::callback(product, product)
             );
             bot
@@ -224,7 +224,9 @@ pub async fn set_age(bot: Bot, dialog: Dialog, msg: Message) -> HandlerResult {
 }
 
 pub async fn set_gender(bot: Bot, dialog: Dialog, msg: Message) -> HandlerResult {
-    let genders = ["♂", "♀"].map(|product| InlineKeyboardButton::callback(product, product));
+    let genders = ["Мужской ♂", "Женский ♀"].map(|product|
+        InlineKeyboardButton::callback(product, product)
+    );
     bot
         .send_message(msg.chat.id, "Выбери свой пол")
         .reply_markup(InlineKeyboardMarkup::new([genders])).await?;

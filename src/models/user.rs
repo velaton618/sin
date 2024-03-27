@@ -1,6 +1,6 @@
 use crate::user_state::UserState;
 
-use super::{chat_type::ChatType, gender::Gender};
+use super::{ chat_type::ChatType, gender::Gender };
 
 #[derive(Debug)]
 pub struct User {
@@ -14,6 +14,8 @@ pub struct User {
     pub reputation: i32,
     pub is_banned: bool,
     pub referrals: u32,
+    pub is_premium: bool,
+    pub premium_until: i64,
 }
 impl User {
     pub fn new(id: i64, age: u8, nickname: String, gender: Gender) -> Self {
@@ -28,6 +30,8 @@ impl User {
             reputation: 0,
             is_banned: false,
             referrals: 0,
+            is_premium: false,
+            premium_until: 0,
         }
     }
 }

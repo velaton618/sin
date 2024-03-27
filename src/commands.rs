@@ -1,5 +1,6 @@
-use std::env;
+use std::{ env, time::Duration };
 
+use chrono::{ DateTime, Datelike };
 use teloxide::{
     payloads::SendMessageSetters,
     requests::Requester,
@@ -138,7 +139,7 @@ pub async fn referral(bot: Bot, _: Dialog, msg: Message) -> HandlerResult {
     let link = format!("https://t.me/s1nchat_bot?start={}", msg.chat.id.0);
     bot.send_message(
         msg.chat.id,
-        format!("Твоя реферальная ссылка: {}\n\nПример использования:", link)
+        format!("Пригласи 10 человек и получи бесплатный премиум на неделю!\n\nТвоя реферальная ссылка: {}\n\nПример использования:", link)
     ).await?;
 
     bot.send_message(
@@ -162,9 +163,9 @@ pub async fn top(bot: Bot, _: Dialog, msg: Message) -> HandlerResult {
                 &format!(
                     "{} {} » {}\n",
                     if user.gender == Gender::Male {
-                        "♂"
+                        "Мужской ♂"
                     } else {
-                        "♀"
+                        "Женский ♀"
                     },
                     user.nickname,
                     user.referrals
@@ -180,6 +181,14 @@ pub async fn top(bot: Bot, _: Dialog, msg: Message) -> HandlerResult {
     Ok(())
 }
 
+pub async fn premium(bot: Bot, _: Dialog, msg: Message) -> HandlerResult {
+    bot.send_message(
+        msg.chat.id,
+        "Пригласи 10 человек и получи бесплатный премиум на неделю!\n\n💎 Что даёт премиум?\n\nПолучив премиум вы можете:\n\n1. Иметь полную информацию о собеседнике\n2. разделение пошлого и обычного чата\n3. Первее получите доступ к новым функциям чата\n4. Все видят ваш премиум"
+    ).await.unwrap();
+
+    Ok(())
+}
 pub async fn top_rep(bot: Bot, _: Dialog, msg: Message) -> HandlerResult {
     let db = DATABASE.get().unwrap().lock().await;
     let users = db.get_top_reputation_users(10);
@@ -191,11 +200,16 @@ pub async fn top_rep(bot: Bot, _: Dialog, msg: Message) -> HandlerResult {
         for user in users {
             response.push_str(
                 &format!(
-                    "{} {} » {}\n",
-                    if user.gender == Gender::Male {
-                        "♂"
+                    "{} {} {} » {}\n",
+                    if user.is_premium {
+                        "💎 Премиум"
                     } else {
-                        "♀"
+                        ""
+                    },
+                    if user.gender == Gender::Male {
+                        "Мужской ♂"
+                    } else {
+                        "Женский ♀"
                     },
                     user.nickname,
                     user.reputation
@@ -236,13 +250,18 @@ pub async fn user_info(bot: Bot, _: Dialog, msg: Message) -> HandlerResult {
                 bot.send_message(
                     msg.chat.id,
                     format!(
-                        "{}\n\nНикнейм: {}\nПол: {}\nВозраст: {}\nРепутация: {}\nКоличество приглашенных людей: {}",
+                        "{}\n\n🆔: {}\nНикнейм: {}\nПол: {}\nВозраст: {}\nРепутация: {}\nКоличество приглашенных людей: {}",
+                        if user.is_premium {
+                            "💎 Премиум"
+                        } else {
+                            ""
+                        },
                         user.id,
                         user.nickname,
                         if user.gender == Gender::Male {
-                            "♂"
+                            "Мужской ♂"
                         } else {
-                            "♀"
+                            "Женский ♀"
                         },
                         user.age,
                         user.reputation,
@@ -263,9 +282,9 @@ pub async fn user_info(bot: Bot, _: Dialog, msg: Message) -> HandlerResult {
                 user.id,
                 user.nickname,
                 if user.gender == Gender::Male {
-                    "♂"
+                    "Мужской ♂"
                 } else {
-                    "♀"
+                    "Женский ♀"
                 },
                 user.age,
                 user.reputation,
@@ -335,7 +354,7 @@ pub async fn admin(bot: Bot, _: Dialog, msg: Message) -> HandlerResult {
         bot.send_message(
             msg.chat.id,
             format!(
-                "Users: {}\n♂ Males: {}\n♀ Females: {}\n\n💬 Chats: {}\nQueue: {}\n\n\n♂ Queue Males: {}\n♀ Queue Females: {}",
+                "Users: {}\nМужской ♂ Males: {}\nЖенский ♀ Females: {}\n\n💬 Chats: {}\nQueue: {}\n\n\nМужской ♂ Queue Males: {}\nЖенский ♀ Queue Females: {}",
                 total_users,
                 male_count,
                 female_count,
@@ -417,6 +436,17 @@ pub async fn next(bot: Bot, dialog: Dialog, msg: Message) -> HandlerResult {
                 bot.send_message(ChatId(user.id), "Вы заблокаированы!").await?;
                 return Ok(());
             }
+            if user.is_premium {
+                let now = chrono::Utc::now();
+
+                if now.timestamp() > user.premium_until {
+                    db.set_premium(user.id, false).unwrap();
+                    db.set_premium_until(user.id, 0).unwrap();
+
+                    bot.send_message(ChatId(user.id), "Ваша подписка закончилась!").await?;
+                }
+            }
+
             if user.search_gender.is_none() || user.chat_type.is_none() {
                 bot.send_message(
                     ChatId(user.id),
@@ -470,42 +500,61 @@ pub async fn next(bot: Bot, dialog: Dialog, msg: Message) -> HandlerResult {
                         interlocutor: result as u64,
                     }).await?;
                     let interlocutor = db.get_user(result).unwrap().unwrap();
-                    bot.send_message(
-                        dialog.chat_id(),
-                        format!(
-                            "{} \n\nСобеседник найден!\n\nПол: {}\nПсевдоним: {} \nВозраст: {}\n\n/next - чтобы найти нового собеседника\n/stop - чтобы остановить диалог",
-                            if user.chat_type == Some(ChatType::Regular) {
-                                "💬"
-                            } else {
-                                "🔞"
-                            },
-                            if interlocutor.gender == Gender::Male {
-                                "♂"
-                            } else {
-                                "♀"
-                            },
-                            interlocutor.nickname,
-                            interlocutor.age
-                        )
-                    ).await?;
-                    bot.send_message(
-                        ChatId(result),
-                        format!(
-                            "{} \n\nСобеседник найден!\n\nПол: {}\nПсевдоним: {} \nВозраст: {}\n\n/next - чтобы найти нового собеседника\n/stop - чтобы остановить диалог",
-                            if user.chat_type == Some(ChatType::Regular) {
-                                "💬"
-                            } else {
-                                "🔞"
-                            },
-                            if interlocutor.gender == Gender::Male {
-                                "♂"
-                            } else {
-                                "♀"
-                            },
-                            interlocutor.nickname,
-                            interlocutor.age
-                        )
-                    ).await?;
+
+                    if user.is_premium {
+                        bot.send_message(
+                            dialog.chat_id(),
+                            format!(
+                                "🆔: {}\nПол: {}\nПсевдоним: {} \nВозраст: {}\n\nСобеседник найден!\n\n/next - чтобы найти нового собеседника\n/stop - чтобы остановить диалог",
+
+                                interlocutor.id,
+                                if interlocutor.gender == Gender::Male {
+                                    "Мужской ♂"
+                                } else {
+                                    "Женский ♀"
+                                },
+                                interlocutor.nickname,
+                                interlocutor.age
+                            )
+                        ).await?;
+                    } else {
+                        bot.send_message(
+                            dialog.chat_id(),
+                            format!(
+                                "Собеседник найден!\n\n/next - чтобы найти нового собеседника\n/stop - чтобы остановить диалог"
+                            )
+                        ).await?;
+                    }
+
+                    if interlocutor.is_premium {
+                        bot.send_message(
+                            ChatId(result),
+                            format!(
+                                "{} \n\nСобеседник найден!\n\n🆔: {}\nПол: {}\nПсевдоним: {} \nВозраст: {}\n\n/next - чтобы найти нового собеседника\n/stop - чтобы остановить диалог",
+                                if user.chat_type == Some(ChatType::Regular) {
+                                    "💬"
+                                } else {
+                                    "🔞"
+                                },
+                                user.id,
+                                if user.gender == Gender::Male {
+                                    "Мужской ♂"
+                                } else {
+                                    "Женский ♀"
+                                },
+                                user.nickname,
+                                user.age
+                            )
+                        ).await?;
+                    } else {
+                        bot.send_message(
+                            ChatId(result),
+                            format!(
+                                "Собеседник найден!\n\n/next - чтобы найти нового собеседника\n/stop - чтобы остановить диалог"
+                            )
+                        ).await?;
+                    }
+
                     db.set_user_state(user.id, user_state::UserState::Dialog).unwrap();
                     db.set_user_state(result, user_state::UserState::Dialog).unwrap();
                 } else {
@@ -544,10 +593,41 @@ pub async fn start(bot: Bot, dialog: Dialog, msg: Message) -> HandlerResult {
                         let u = db.get_user(msg.chat.id.0);
 
                         if u.is_err() || u.unwrap().is_none() {
+                            if user.referrals + 1 >= 10 {
+                                db.set_premium(user.id, true).unwrap();
+
+                                let new_premium;
+                                if user.is_premium {
+                                    let old_premium = match
+                                        DateTime::from_timestamp(user.premium_until, 0)
+                                    {
+                                        Some(o) => o,
+                                        None => chrono::Utc::now(),
+                                    };
+                                    new_premium =
+                                        old_premium + chrono::Duration::try_days(7).unwrap();
+                                } else {
+                                    let now = chrono::Utc::now();
+                                    new_premium = now + chrono::Duration::try_seconds(1).unwrap();
+                                }
+                                db.set_premium_until(user.id, new_premium.timestamp()).unwrap();
+
+                                bot.send_message(ChatId(user.id), "Вы получили премиум 💎").await?;
+                                let _ = bot.send_message(
+                                    ChatId(user.id),
+                                    format!(
+                                        "Ваш премиум действует до: {}",
+                                        new_premium.format("%d.%m.%Y")
+                                    )
+                                ).await;
+                            }
                             let _ = db.increase_referral_count(user.id);
                             let _ = bot.send_message(
                                 ChatId(user.id),
-                                "По вашей реферальной ссылке перешёл 1 человек!"
+                                format!(
+                                    "По вашей реферальной ссылке перешёл 1 человек! \n\nДо получения премиум 💎 осталось: {} человек",
+                                    10 - (user.referrals + 1)
+                                )
                             ).await;
                         }
                     }
@@ -600,7 +680,7 @@ pub async fn idle(bot: Bot, dialog: Dialog, msg: Message) -> HandlerResult {
                 return Ok(());
             }
 
-            let genders = ["♂", "♀"].map(|product|
+            let genders = ["Мужской ♂", "Женский ♀"].map(|product|
                 InlineKeyboardButton::callback(product, product)
             );
             bot.send_message(dialog.chat_id(), "Теперь выбери пол собеседника")

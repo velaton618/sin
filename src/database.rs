@@ -1,9 +1,6 @@
-use crate::{
-    models::{chat_type::ChatType, gender::Gender, user::User},
-    user_state::UserState,
-};
+use crate::{ models::{ chat_type::ChatType, gender::Gender, user::User }, user_state::UserState };
 use log::error;
-use rusqlite::{params, Connection, OptionalExtension, Result};
+use rusqlite::{ params, Connection, OptionalExtension, Result };
 
 pub struct Database {
     connection: Connection,
@@ -17,6 +14,8 @@ impl Database {
         connection.execute(
             "CREATE TABLE IF NOT EXISTS users (
                   id INTEGER PRIMARY KEY,
+                  is_premium BOOLEAN DEFAULT 0,
+                  premium_until INTEGER DEFAULT 0,
                   nickname TEXT NOT NULL,
                   age INTEGER NOT NULL,
                   gender TEXT NOT NULL,
@@ -27,7 +26,7 @@ impl Database {
                   is_banned BOOLEAN DEFAULT 0,
                   referrals INTEGER DEFAULT 0
                   )",
-            [],
+            []
         )?;
 
         connection.execute(
@@ -38,7 +37,7 @@ impl Database {
                 chat_type INTEGER DEFAULT 0,
                 UNIQUE(user_id)
             )",
-            [],
+            []
         )?;
 
         connection.execute(
@@ -50,7 +49,7 @@ impl Database {
                   UNIQUE(chat_one),
                   UNIQUE(chat_two)
                   )",
-            [],
+            []
         )?;
 
         Ok(Database { connection })
@@ -71,9 +70,7 @@ impl Database {
     }
 
     pub fn get_gender_count(&self, gender: Gender) -> Result<usize> {
-        let mut stmt = self
-            .connection
-            .prepare("SELECT COUNT(*) FROM users WHERE gender = ?1")?;
+        let mut stmt = self.connection.prepare("SELECT COUNT(*) FROM users WHERE gender = ?1")?;
         let count: usize = stmt.query_row(params![gender.to_string()], |row| row.get(0))?;
         Ok(count)
     }
@@ -85,9 +82,9 @@ impl Database {
     }
 
     pub fn get_chat(&self, user_id: i64) -> Result<Option<i64>> {
-        let mut stmt = self
-            .connection
-            .prepare("SELECT chat_one, chat_two FROM chats WHERE chat_one = ?1 OR chat_two = ?1")?;
+        let mut stmt = self.connection.prepare(
+            "SELECT chat_one, chat_two FROM chats WHERE chat_one = ?1 OR chat_two = ?1"
+        )?;
 
         let chat = stmt
             .query_row(params![user_id], |row| {
@@ -120,7 +117,7 @@ impl Database {
 
     pub fn get_gender_queue_count(&self, gender: Gender) -> Result<usize> {
         let mut stmt = self.connection.prepare(
-            "SELECT COUNT(*) FROM queue INNER JOIN users ON queue.user_id = users.id WHERE users.gender = ?1",
+            "SELECT COUNT(*) FROM queue INNER JOIN users ON queue.user_id = users.id WHERE users.gender = ?1"
         )?;
         let count: usize = stmt.query_row(params![gender.to_string()], |row| row.get(0))?;
         Ok(count)
@@ -131,13 +128,13 @@ impl Database {
 
         self.connection.execute(
             "UPDATE users SET reputation = ?1 WHERE id = ?2",
-            params![current_reputation - amount, user_id],
+            params![current_reputation - amount, user_id]
         )?;
 
         if current_reputation - amount <= Self::BAN_REPUTATION {
             self.connection.execute(
                 "UPDATE users SET is_banned = ?1 WHERE id = ?2",
-                params![true, user_id],
+                params![true, user_id]
             )?;
 
             return Ok(true);
@@ -148,7 +145,7 @@ impl Database {
     pub fn ban_user(&self, user_id: i64) -> Result<()> {
         self.connection.execute(
             "UPDATE users SET is_banned = ?1 WHERE id = ?2",
-            params![true, user_id],
+            params![true, user_id]
         )?;
 
         Ok(())
@@ -157,7 +154,7 @@ impl Database {
     pub fn unban_user(&self, user_id: i64) -> Result<()> {
         self.connection.execute(
             "UPDATE users SET is_banned = ?1 WHERE id = ?2",
-            params![false, user_id],
+            params![false, user_id]
         )?;
 
         Ok(())
@@ -168,13 +165,13 @@ impl Database {
 
         self.connection.execute(
             "UPDATE users SET reputation = ?1 WHERE id = ?2",
-            params![current_reputation + amount, user_id],
+            params![current_reputation + amount, user_id]
         )?;
 
         if current_reputation - amount >= Self::BAN_REPUTATION {
             self.connection.execute(
                 "UPDATE users SET is_banned = ?1 WHERE id = ?2",
-                params![false, user_id],
+                params![false, user_id]
             )?;
 
             return Ok(false);
@@ -183,9 +180,7 @@ impl Database {
     }
 
     fn get_user_reputation(&self, user_id: i64) -> Result<i32> {
-        let mut stmt = self
-            .connection
-            .prepare("SELECT reputation FROM users WHERE id = ?1")?;
+        let mut stmt = self.connection.prepare("SELECT reputation FROM users WHERE id = ?1")?;
         let reputation: Result<i32> = stmt.query_row(params![user_id], |row| row.get(0));
 
         reputation
@@ -194,20 +189,15 @@ impl Database {
     pub fn add_user(&self, user: &User) -> Result<()> {
         self.connection.execute(
             "INSERT INTO users (id, nickname, age, gender) VALUES (?1, ?2, ?3, ?4)",
-            params![
-                user.id.clone(),
-                user.nickname.clone(),
-                user.age,
-                user.gender.to_string()
-            ],
+            params![user.id.clone(), user.nickname.clone(), user.age, user.gender.to_string()]
         )?;
         Ok(())
     }
 
     pub fn delete_chat(&self, user_id: i64) -> Result<Option<i64>> {
-        let mut stmt = self
-            .connection
-            .prepare("SELECT chat_one, chat_two FROM chats WHERE chat_one = ?1 OR chat_two = ?1")?;
+        let mut stmt = self.connection.prepare(
+            "SELECT chat_one, chat_two FROM chats WHERE chat_one = ?1 OR chat_two = ?1"
+        )?;
 
         let interlocutor_id = stmt
             .query_row(params![user_id], |row| {
@@ -225,7 +215,7 @@ impl Database {
         if let Some(interlocutor_id) = interlocutor_id {
             self.connection.execute(
                 "DELETE FROM chats WHERE (chat_one = ?1 AND chat_two = ?2) OR (chat_one = ?2 AND chat_two = ?1)",
-                params![user_id, interlocutor_id],
+                params![user_id, interlocutor_id]
             )?;
         }
 
@@ -233,9 +223,9 @@ impl Database {
     }
 
     pub fn get_user(&self, user_id: i64) -> Result<Option<User>> {
-        let mut stmt = self
-        .connection
-        .prepare("SELECT id, nickname, age, gender, state, reputation, is_banned, search_gender, chat_type, referrals FROM users WHERE id = ?1")?;
+        let mut stmt = self.connection.prepare(
+            "SELECT id, nickname, age, gender, state, reputation, is_banned, search_gender, chat_type, referrals, is_premium, premium_until FROM users WHERE id = ?1"
+        )?;
         let user = stmt
             .query_row(params![user_id], |row| {
                 let id: i64 = row.get(0)?;
@@ -257,6 +247,8 @@ impl Database {
                 };
                 let chat_type: i32 = row.get(8)?;
                 let referrals: u32 = row.get(9)?;
+                let is_premium: bool = row.get(10)?;
+                let premium_until: i64 = row.get(11)?;
 
                 Ok(User {
                     id: id,
@@ -269,6 +261,8 @@ impl Database {
                     search_gender: Some(search_gender),
                     chat_type: Some(ChatType::from(chat_type)),
                     referrals: referrals,
+                    is_premium: is_premium,
+                    premium_until,
                 })
             })
             .optional()?;
@@ -278,15 +272,15 @@ impl Database {
     pub fn increase_referral_count(&self, user_id: i64) -> Result<()> {
         self.connection.execute(
             "UPDATE users SET referrals = referrals + 1 WHERE id = ?1",
-            params![user_id],
+            params![user_id]
         )?;
         Ok(())
     }
 
     pub fn get_top_referral_users(&self, limit: usize) -> Result<Vec<User>> {
         let mut stmt = self.connection.prepare(
-        "SELECT id, nickname, age, gender, state, reputation, is_banned, search_gender, chat_type, referrals FROM users ORDER BY referrals DESC LIMIT ?1",
-    )?;
+            "SELECT id, nickname, age, gender, state, reputation, is_banned, search_gender, chat_type, referrals, is_premium, premium_until FROM users ORDER BY referrals DESC LIMIT ?1"
+        )?;
         let user_iter = stmt.query_map(params![limit as i64], |row| {
             let id: i64 = row.get(0)?;
             let nickname: String = row.get(1)?;
@@ -307,6 +301,8 @@ impl Database {
             };
             let chat_type: i32 = row.get(8)?;
             let referrals: u32 = row.get(9)?;
+            let is_premium: bool = row.get(10)?;
+            let premium_until: i64 = row.get(11)?;
 
             Ok(User {
                 id,
@@ -319,6 +315,8 @@ impl Database {
                 search_gender: Some(search_gender),
                 chat_type: Some(ChatType::from(chat_type)),
                 referrals,
+                is_premium,
+                premium_until,
             })
         })?;
 
@@ -327,8 +325,7 @@ impl Database {
     }
 
     pub fn delete_user_by_id(&self, user_id: i64) -> Result<()> {
-        self.connection
-            .execute("DELETE FROM users WHERE id = ?1", params![user_id])?;
+        self.connection.execute("DELETE FROM users WHERE id = ?1", params![user_id])?;
         let _ = self.delete_chat(user_id);
         let _ = self.dequeue_user(user_id);
 
@@ -337,8 +334,8 @@ impl Database {
 
     pub fn get_top_reputation_users(&self, limit: usize) -> Result<Vec<User>> {
         let mut stmt = self.connection.prepare(
-        "SELECT id, nickname, age, gender, state, reputation, is_banned, search_gender, chat_type, referrals FROM users ORDER BY reputation DESC LIMIT ?1",
-    )?;
+            "SELECT id, nickname, age, gender, state, reputation, is_banned, search_gender, chat_type, referrals, is_premium, premium_until FROM users ORDER BY reputation DESC LIMIT ?1"
+        )?;
         let user_iter = stmt.query_map(params![limit as i64], |row| {
             let id: i64 = row.get(0)?;
             let nickname: String = row.get(1)?;
@@ -359,6 +356,8 @@ impl Database {
             };
             let chat_type: i32 = row.get(8)?;
             let referrals: u32 = row.get(9)?;
+            let is_premium: bool = row.get(10)?;
+            let premium_until: i64 = row.get(11)?;
 
             Ok(User {
                 id,
@@ -371,6 +370,8 @@ impl Database {
                 search_gender: Some(search_gender),
                 chat_type: Some(ChatType::from(chat_type)),
                 referrals,
+                is_premium,
+                premium_until,
             })
         })?;
 
@@ -379,9 +380,9 @@ impl Database {
     }
 
     pub fn get_all_users(&self) -> Result<Vec<User>> {
-        let mut stmt = self
-        .connection
-        .prepare("SELECT id, nickname, age, gender, state, reputation, is_banned, search_gender, chat_type, referrals FROM users")?;
+        let mut stmt = self.connection.prepare(
+            "SELECT id, nickname, age, gender, state, reputation, is_banned, search_gender, chat_type, referrals, is_premium, premium_until FROM users"
+        )?;
 
         let user_iter = stmt.query_map([], |row| {
             let id: i64 = row.get(0)?;
@@ -403,6 +404,8 @@ impl Database {
             };
             let chat_type: i32 = row.get(8)?;
             let referrals: u32 = row.get(9)?;
+            let is_premium: bool = row.get(10)?;
+            let premium_until: i64 = row.get(11)?;
 
             Ok(User {
                 id: id,
@@ -415,6 +418,8 @@ impl Database {
                 search_gender: Some(search_gender),
                 chat_type: Some(ChatType::from(chat_type)),
                 referrals: referrals,
+                is_premium,
+                premium_until,
             })
         })?;
 
@@ -426,7 +431,37 @@ impl Database {
         let state_int = new_state as i32;
         self.connection.execute(
             "UPDATE users SET state = ?1 WHERE id = ?2",
-            params![state_int, user_id],
+            params![state_int, user_id]
+        )?;
+        Ok(())
+    }
+
+    pub fn set_premium_until(&self, user_id: i64, until: i64) -> Result<()> {
+        self.connection.execute(
+            "UPDATE users SET premium_until = ?1 WHERE id = ?2",
+            params![until, user_id]
+        )?;
+        Ok(())
+    }
+
+    pub fn get_premium_until(&self, user_id: i64) -> Result<i64> {
+        let mut stmt = self.connection.prepare("SELECT premium_until FROM users WHERE id = ?1")?;
+        let premium_until: Result<i64> = stmt.query_row(params![user_id], |row| row.get(0));
+
+        premium_until
+    }
+
+    pub fn get_premium(&self, user_id: i64) -> Result<bool> {
+        let mut stmt = self.connection.prepare("SELECT is_premium FROM users WHERE id = ?1")?;
+        let premium: Result<bool> = stmt.query_row(params![user_id], |row| row.get(0));
+
+        premium
+    }
+
+    pub fn set_premium(&self, user_id: i64, is_premium: bool) -> Result<()> {
+        self.connection.execute(
+            "UPDATE users SET is_premium = ?1 WHERE id = ?2",
+            params![is_premium, user_id]
         )?;
         Ok(())
     }
@@ -434,7 +469,7 @@ impl Database {
     pub fn set_search_gender(&self, user_id: i64, gender: Gender) -> Result<()> {
         self.connection.execute(
             "UPDATE users SET search_gender = ?1 WHERE id = ?2",
-            params![gender.to_string(), user_id],
+            params![gender.to_string(), user_id]
         )?;
         Ok(())
     }
@@ -442,7 +477,7 @@ impl Database {
     pub fn set_chat_type(&self, user_id: i64, chat_type: ChatType) -> Result<()> {
         self.connection.execute(
             "UPDATE users SET chat_type = ?1 WHERE id = ?2",
-            params![chat_type as i32, user_id],
+            params![chat_type as i32, user_id]
         )?;
         Ok(())
     }
@@ -451,11 +486,11 @@ impl Database {
         &self,
         user_id_one: i64,
         user_id_two: i64,
-        chat_type: ChatType,
+        chat_type: ChatType
     ) -> Result<()> {
         self.connection.execute(
             "INSERT INTO chats (chat_one, chat_two, chat_type) VALUES (?1, ?2, ?3)",
-            params![user_id_one, user_id_two, chat_type as i32],
+            params![user_id_one, user_id_two, chat_type as i32]
         )?;
         Ok(())
     }
@@ -465,12 +500,12 @@ impl Database {
         user_id: i64,
         search_gender: Gender,
         searcher_gender: Gender,
-        chat_type: ChatType,
+        chat_type: ChatType
     ) -> Result<i64> {
         let _ = self.set_chat_type(user_id, chat_type.clone());
         let _ = self.set_search_gender(user_id, search_gender);
         let mut stmt = self.connection.prepare(
-            "SELECT user_id FROM queue WHERE searcher_gender = ?1 AND search_gender = ?2 AND chat_type = ?3 LIMIT 1",
+            "SELECT user_id FROM queue WHERE searcher_gender = ?1 AND search_gender = ?2 AND chat_type = ?3 LIMIT 1"
         )?;
         let matching_user_id: Result<i64> = stmt.query_row(
             params![
@@ -478,7 +513,7 @@ impl Database {
                 searcher_gender.clone() as i32,
                 chat_type.clone() as i32
             ],
-            |row| row.get(0),
+            |row| row.get(0)
         );
 
         match matching_user_id {
@@ -487,8 +522,7 @@ impl Database {
                     return Ok(0);
                 }
 
-                self.connection
-                    .execute("DELETE FROM queue WHERE user_id = ?1", params![match_id])?;
+                self.connection.execute("DELETE FROM queue WHERE user_id = ?1", params![match_id])?;
                 self.create_chat(user_id, match_id, chat_type)?;
 
                 return Ok(match_id);
@@ -497,7 +531,7 @@ impl Database {
                 error!("{}", e);
                 self.connection.execute(
                     "INSERT INTO queue (user_id, search_gender, searcher_gender, chat_type) VALUES (?1, ?2, ?3, ?4)",
-                    params![user_id, search_gender as i32, searcher_gender as i32, chat_type as i32],
+                    params![user_id, search_gender as i32, searcher_gender as i32, chat_type as i32]
                 )?;
             }
         }
@@ -506,15 +540,14 @@ impl Database {
     }
 
     pub fn dequeue_user(&self, user_id: i64) -> Result<()> {
-        self.connection
-            .execute("DELETE FROM queue WHERE user_id = ?1", params![user_id])?;
+        self.connection.execute("DELETE FROM queue WHERE user_id = ?1", params![user_id])?;
         Ok(())
     }
 
     pub fn update_user_nickname(&self, user_id: i64, new_nickname: &str) -> Result<()> {
         self.connection.execute(
             "UPDATE users SET nickname = ?1 WHERE id = ?2",
-            params![new_nickname, user_id],
+            params![new_nickname, user_id]
         )?;
         Ok(())
     }
@@ -522,7 +555,7 @@ impl Database {
     pub fn update_user_age(&self, user_id: i64, new_age: u8) -> Result<()> {
         self.connection.execute(
             "UPDATE users SET age = ?1 WHERE id = ?2",
-            params![new_age, user_id],
+            params![new_age, user_id]
         )?;
         Ok(())
     }
@@ -530,7 +563,7 @@ impl Database {
     pub fn update_user_gender(&self, user_id: i64, new_gender: Gender) -> Result<()> {
         self.connection.execute(
             "UPDATE users SET gender = ?1 WHERE id = ?2",
-            params![new_gender.to_string(), user_id],
+            params![new_gender.to_string(), user_id]
         )?;
         Ok(())
     }

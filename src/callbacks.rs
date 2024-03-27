@@ -1,3 +1,4 @@
+use chrono::Datelike;
 use log::debug;
 use teloxide::{
     payloads::SendMessageSetters,
@@ -27,7 +28,7 @@ pub async fn receive_gender(
 
     if let Some(g) = &q.data {
         let gender;
-        if g == "♂" {
+        if g == "Мужской ♂" {
             gender = Gender::Male;
         } else {
             gender = Gender::Female;
@@ -40,16 +41,30 @@ pub async fn receive_gender(
 
         let _ = db.add_user(&user);
 
+        let now = chrono::Utc::now();
+
+        if now.month() == 3 || now.month() == 4 {
+            let _ = db.set_premium(dialog.chat_id().0, true);
+            let _ = db.set_premium_until(dialog.chat_id().0, now.timestamp() + 604800);
+
+            bot.send_message(
+                dialog.chat_id(),
+                "💎 Вы попали на акцию, и получили бесплатный премиум на 7 дней!"
+            ).await?;
+        }
+
         bot.send_message(
             dialog.chat_id(),
             format!("Готово!\n\n{} {} {}", nickname, age, if gender == Gender::Male {
-                "♂"
+                "Мужской ♂"
             } else {
-                "♀"
+                "Женский ♀"
             })
         ).await?;
 
-        let genders = ["♂", "♀"].map(|product| InlineKeyboardButton::callback(product, product));
+        let genders = ["Мужской ♂", "Женский ♀"].map(|product|
+            InlineKeyboardButton::callback(product, product)
+        );
         bot
             .send_message(dialog.chat_id(), "Теперь выбери пол собеседника")
             .reply_markup(InlineKeyboardMarkup::new([genders])).await?;
@@ -81,7 +96,7 @@ pub async fn search_callback(bot: Bot, dialog: Dialog, q: CallbackQuery) -> Hand
 
         let gender;
 
-        if g == "♂" {
+        if g == "Мужской ♂" {
             gender = Gender::Male;
         } else {
             gender = Gender::Female;
@@ -109,7 +124,7 @@ pub async fn receive_set_gender(bot: Bot, dialog: Dialog, q: CallbackQuery) -> H
         ).lock().await;
         let gender;
 
-        if g == "♂" {
+        if g == "Мужской ♂" {
             gender = Gender::Male;
         } else {
             gender = Gender::Female;
@@ -185,6 +200,16 @@ pub async fn chat_type_callback(
                     bot.send_message(ChatId(user.id), "Вы заблокаированы!").await?;
                     return Ok(());
                 }
+                if user.is_premium {
+                    let now = chrono::Utc::now();
+
+                    if now.timestamp() > user.premium_until {
+                        db.set_premium(user.id, false).unwrap();
+                        db.set_premium_until(user.id, 0).unwrap();
+
+                        bot.send_message(ChatId(user.id), "Ваша подписка закончилась!").await?;
+                    }
+                }
                 let result = db.enqueue_user(
                     dialog.chat_id().0,
                     gender,
@@ -201,42 +226,65 @@ pub async fn chat_type_callback(
                             interlocutor: result as u64,
                         }).await?;
                         let interlocutor = db.get_user(result).unwrap().unwrap();
-                        bot.send_message(
-                            dialog.chat_id(),
-                            format!(
-                                "{} \n\nПол: {}\nПсевдоним: {} \nВозраст: {}\n\nСобеседник найден!\n\n/next - чтобы найти нового собеседника\n/stop - чтобы остановить диалог",
-                                if chat_type == ChatType::Regular {
-                                    "💬"
-                                } else {
-                                    "🔞"
-                                },
-                                if interlocutor.gender == Gender::Male {
-                                    "♂"
-                                } else {
-                                    "♀"
-                                },
-                                interlocutor.nickname,
-                                interlocutor.age
-                            )
-                        ).await?;
-                        bot.send_message(
-                            ChatId(result),
-                            format!(
-                                "{} \n\nСобеседник найден!\n\nПол: {}\nПсевдоним: {} \nВозраст: {}\n\n/next - чтобы найти нового собеседника\n/stop - чтобы остановить диалог",
-                                if user.chat_type == Some(ChatType::Regular) {
-                                    "💬"
-                                } else {
-                                    "🔞"
-                                },
-                                if interlocutor.gender == Gender::Male {
-                                    "♂"
-                                } else {
-                                    "♀"
-                                },
-                                interlocutor.nickname,
-                                interlocutor.age
-                            )
-                        ).await?;
+
+                        if user.is_premium {
+                            bot.send_message(
+                                dialog.chat_id(),
+                                format!(
+                                    "{} \n\n🆔: {}\nПол: {}\nПсевдоним: {} \nВозраст: {}\n\nСобеседник найден!\n\n/next - чтобы найти нового собеседника\n/stop - чтобы остановить диалог",
+                                    if chat_type == ChatType::Regular {
+                                        "💬"
+                                    } else {
+                                        "🔞"
+                                    },
+                                    interlocutor.id,
+                                    if interlocutor.gender == Gender::Male {
+                                        "Мужской ♂"
+                                    } else {
+                                        "Женский ♀"
+                                    },
+                                    interlocutor.nickname,
+                                    interlocutor.age
+                                )
+                            ).await?;
+                        } else {
+                            bot.send_message(
+                                dialog.chat_id(),
+                                format!(
+                                    "Собеседник найден!\n\n/next - чтобы найти нового собеседника\n/stop - чтобы остановить диалог"
+                                )
+                            ).await?;
+                        }
+
+                        if interlocutor.is_premium {
+                            bot.send_message(
+                                ChatId(result),
+                                format!(
+                                    "{} \n\nСобеседник найден!\n\n🆔: {}\nПол: {}\nПсевдоним: {} \nВозраст: {}\n\n/next - чтобы найти нового собеседника\n/stop - чтобы остановить диалог",
+                                    if user.chat_type == Some(ChatType::Regular) {
+                                        "💬"
+                                    } else {
+                                        "🔞"
+                                    },
+                                    user.id,
+                                    if user.gender == Gender::Male {
+                                        "Мужской ♂"
+                                    } else {
+                                        "Женский ♀"
+                                    },
+                                    user.nickname,
+                                    user.age
+                                )
+                            ).await?;
+                        } else {
+                            bot.send_message(
+                                ChatId(result),
+                                format!(
+                                    "Собеседник найден!\n\n/next - чтобы найти нового собеседника\n/stop - чтобы остановить диалог"
+                                )
+                            ).await?;
+                        }
+
                         db.set_user_state(user.id, user_state::UserState::Dialog).unwrap();
                         db.set_user_state(result, user_state::UserState::Dialog).unwrap();
                     } else {
